@@ -13,8 +13,10 @@
     "@tanstack/react-router": "^1.120.13",
     "@tanstack/react-router-devtools": "^1.120.13",
     "@tanstack/router": "0.0.1-beta.53",
+    "lib0": "^0.2.108",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "uuid": "^11.1.0",
     "y-webrtc": "^10.3.0",
     "yjs": "^13.6.27"
   },
