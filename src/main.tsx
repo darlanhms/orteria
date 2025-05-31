@@ -4,6 +4,7 @@ import { RouterProvider, createRouter } from '@tanstack/react-router';
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen';
+import type { ScoringSessionRequest } from './lib/score';
 
 // Create a new router instance
 const router = createRouter({ routeTree });
@@ -12,6 +13,9 @@ const router = createRouter({ routeTree });
 declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router;
+  }
+  interface HistoryState {
+    newScoringSession?: ScoringSessionRequest;
   }
 }
 

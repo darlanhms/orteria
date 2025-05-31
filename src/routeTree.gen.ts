@@ -12,12 +12,19 @@
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as IndexImport } from './routes/index'
+import { Route as ScoringSessionIdImport } from './routes/scoring/$sessionId'
 
 // Create/Update Routes
 
 const IndexRoute = IndexImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const ScoringSessionIdRoute = ScoringSessionIdImport.update({
+  id: '/scoring/$sessionId',
+  path: '/scoring/$sessionId',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -32,6 +39,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
+    '/scoring/$sessionId': {
+      id: '/scoring/$sessionId'
+      path: '/scoring/$sessionId'
+      fullPath: '/scoring/$sessionId'
+      preLoaderRoute: typeof ScoringSessionIdImport
+      parentRoute: typeof rootRoute
+    }
   }
 }
 
@@ -39,32 +53,37 @@ declare module '@tanstack/react-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/scoring/$sessionId': typeof ScoringSessionIdRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/scoring/$sessionId': typeof ScoringSessionIdRoute
 }
 
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
+  '/scoring/$sessionId': typeof ScoringSessionIdRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/scoring/$sessionId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/scoring/$sessionId'
+  id: '__root__' | '/' | '/scoring/$sessionId'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ScoringSessionIdRoute: typeof ScoringSessionIdRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ScoringSessionIdRoute: ScoringSessionIdRoute,
 }
 
 export const routeTree = rootRoute
@@ -77,11 +96,15 @@ export const routeTree = rootRoute
     "__root__": {
       "filePath": "__root.tsx",
       "children": [
-        "/"
+        "/",
+        "/scoring/$sessionId"
       ]
     },
     "/": {
       "filePath": "index.tsx"
+    },
+    "/scoring/$sessionId": {
+      "filePath": "scoring/$sessionId.tsx"
     }
   }
 }
