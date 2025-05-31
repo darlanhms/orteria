@@ -5,9 +5,9 @@ import { WebrtcProvider, type ProviderOptions } from 'y-webrtc';
 const SESSION_PREFIX = 'orteria-scoring-session-';
 
 export const scoringSessionSchema = z.object({
-  name: z.string(),
-  ownerName: z.string(),
-  possibleScores: z.string(),
+  name: z.string().min(1),
+  ownerName: z.string().min(1),
+  possibleScores: z.string().min(1),
 });
 
 export type ScoringSessionRequest = z.infer<typeof scoringSessionSchema>;
