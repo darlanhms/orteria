@@ -1,32 +1,19 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { CreateScoringSessionForm } from '@/components/home/CreateScoringSessionForm';
-import { Separator } from '@/components/ui/Separator';
-import { EnterExistingScoringSessionForm } from '@/components/home/EnterExistingScoringSessionForm';
+import { createFileRoute } from "@tanstack/react-router"
+import { Button } from "@/components/ui/button"
 
-export const Route = createFileRoute('/')({
-  component: RouteComponent,
-});
+export const Route = createFileRoute("/")({ component: App })
 
-function RouteComponent() {
+function App() {
   return (
-    <div className="h-screen w-screen flex flex-col">
-      <h3 className="text-2xl font-bold text-center">Orteria</h3>
-      <div className="flex flex-col justify-evenly flex-1 mx-auto w-lg">
-        <h5 className="text-sm text-muted-foreground text-center">Retros e pontuações em um só lugar</h5>
-        <div className="space-y-6">
-          <CreateScoringSessionForm />
-          <div className="flex items-center">
-            <div className="basis-2/5">
-              <Separator />
-            </div>
-            <p className="basis-1/5 text-center">OU</p>
-            <div className="basis-2/5">
-              <Separator />
-            </div>
-          </div>
-          <EnterExistingScoringSessionForm />
+    <div className="flex min-h-svh p-6">
+      <div className="flex max-w-md min-w-0 flex-col gap-4 text-sm leading-loose">
+        <div>
+          <h1 className="font-medium">Project ready!</h1>
+          <p>You may now add components and start building.</p>
+          <p>We&apos;ve already added the button component for you.</p>
+          <Button className="mt-2">Button</Button>
         </div>
       </div>
     </div>
-  );
+  )
 }
