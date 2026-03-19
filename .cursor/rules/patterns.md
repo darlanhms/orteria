@@ -3,6 +3,16 @@ description: Coding patterns
 version: 1.0.0
 ---
 
+# Shadcn instructions
+
+Use the latest version of Shadcn to install new components, like this command to add a button component:
+
+```bash
+pnpm dlx shadcn@latest add button
+```
+
+Try to be as consistent as possible between one screen and another and not create a lot of variants of the same component
+
 ## Commit Conventions
 
 - `chore:` Maintenance (16 commits)
@@ -15,3 +25,6 @@ version: 1.0.0
 
 - Test directories: `__tests__/`, `test/`, `tests/`
 - Test files: suffixes `.test.ts[x]` / `.spec.ts[x]`
+
+## About language
+- All user readable text should be written in Brazilian Portuguese

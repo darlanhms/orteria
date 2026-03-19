@@ -1,0 +1,61 @@
+import type { LobbyTab } from "../useTaskScorerLobbyController"
+
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+export interface TopNavBarProps {
+  readonly activeTab: LobbyTab
+  readonly onTabChange: (tab: LobbyTab) => void
+}
+
+const tabs: ReadonlyArray<LobbyTab> = ["Lobby", "Vote", "Board", "History"]
+const tabLabels: Readonly<Record<LobbyTab, string>> = {
+  Lobby: "Salão",
+  Vote: "Voto",
+  Board: "Quadro",
+  History: "Histórico",
+}
+
+export function TopNavBar({ activeTab, onTabChange }: TopNavBarProps) {
+  return (
+    <header className="w-full top-0 sticky z-50 bg-background/80 backdrop-blur">
+      <nav className="flex justify-between items-center px-6 py-4 w-full max-w-none mx-auto">
+        <div className="text-2xl font-bold tracking-tight text-primary">
+          orteria
+        </div>
+
+        <Tabs
+          value={activeTab}
+          onValueChange={(tab) => onTabChange(tab as LobbyTab)}
+          className="hidden md:flex md:w-auto"
+        >
+          <TabsList className="gap-1">
+            {tabs.map((tab) => (
+              <TabsTrigger key={tab} value={tab} aria-label={tabLabels[tab]}>
+                {tabLabels[tab]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full text-foreground/70 hover:text-foreground"
+            aria-label="Configurações"
+          >
+            <span className="material-symbols-outlined" data-icon="settings">
+              settings
+            </span>
+          </Button>
+
+          <div className="h-10 w-10 rounded-full border-2 border-primary/50 overflow-hidden shadow-lg bg-card">
+            <div className="h-full w-full" aria-hidden="true" />
+          </div>
+        </div>
+      </nav>
+    </header>
+  )
+}
+
