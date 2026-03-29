@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import logoSvg from "@/logo.svg"
 
 export type LobbyTab = "Lobby" | "Vote" | "Board" | "History"
 
@@ -20,8 +21,11 @@ export function TopNavBar({ activeTab, onTabChange }: TopNavBarProps) {
   return (
     <header className="w-full top-0 sticky z-50 bg-background/80 backdrop-blur">
       <nav className="flex justify-between items-center px-6 py-4 w-full max-w-none mx-auto">
-        <div className="text-2xl font-bold tracking-tight text-primary">
-          orteria
+        <div className="flex items-center gap-2">
+          <img src={logoSvg} alt="Hermes Scorer" className="h-8 w-8" />
+          <span className="text-2xl font-bold tracking-tight text-primary">
+            Hermes Scorer
+          </span>
         </div>
 
         <Tabs
