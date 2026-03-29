@@ -13,6 +13,8 @@ pnpm dlx shadcn@latest add button
 
 Try to be as consistent as possible between one screen and another and not create a lot of variants of the same component
 
+If a component is not found at shadcn, use https://coss.com/origin to find a more suitable component.
+
 ## Commit Conventions
 
 - `chore:` Maintenance (16 commits)
