@@ -19,10 +19,17 @@ export const authComponent = createClient<DataModel, typeof schema>(
 
 // Better Auth Options
 export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
+  const trustedOrigins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    process.env.BETTER_AUTH_URL,
+  ].filter((origin): origin is string => Boolean(origin));
+
   return {
     appName: "Hermes Score",
     baseURL: process.env.BETTER_AUTH_URL,
     secret: process.env.BETTER_AUTH_SECRET,
+    trustedOrigins,
     socialProviders: {
       google: {
         clientId: process.env.GOOGLE_CLIENT_ID as string,
