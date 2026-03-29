@@ -1,6 +1,14 @@
-import type { SessionParticipant } from "../useSessionController"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+
+export type SessionParticipantStatus = "PRONTO" | "PENSANDO..." | "VOTADO"
+
+export type SessionParticipant = {
+  readonly id: string
+  readonly name: string
+  readonly role: string
+  readonly status: SessionParticipantStatus
+}
 
 export interface ParticipantsPanelProps {
   readonly participants: ReadonlyArray<SessionParticipant>
@@ -68,4 +76,3 @@ export function ParticipantsPanel({
     </Card>
   )
 }
-

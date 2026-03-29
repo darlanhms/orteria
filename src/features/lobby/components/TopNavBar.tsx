@@ -1,7 +1,7 @@
-import type { LobbyTab } from "../useTaskScorerLobbyController"
-
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+export type LobbyTab = "Lobby" | "Vote" | "Board" | "History"
 
 export interface TopNavBarProps {
   readonly activeTab: LobbyTab
@@ -58,4 +58,3 @@ export function TopNavBar({ activeTab, onTabChange }: TopNavBarProps) {
     </header>
   )
 }
-

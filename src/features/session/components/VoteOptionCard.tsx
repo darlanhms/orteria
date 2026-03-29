@@ -1,7 +1,11 @@
-import type { SessionVoteOption } from "../useSessionController"
-
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+
+export type SessionVoteOption = {
+  readonly id: string
+  readonly label: string
+  readonly sizingLabel: string
+}
 
 export interface VoteOptionCardProps {
   readonly option: SessionVoteOption
@@ -50,4 +54,3 @@ export function VoteOptionCard({
     </Button>
   )
 }
-

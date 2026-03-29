@@ -1,14 +1,12 @@
-import type { AccessKeyDigit } from "../useTaskScorerLobbyController"
-import type React from "react"
-
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
+export type AccessKeyDigit = "" | string
+
 export interface JoinSessionSectionProps {
   readonly accessKey: ReadonlyArray<AccessKeyDigit>
-  readonly inputRefs: React.MutableRefObject<Array<HTMLInputElement | null>>
   readonly isEnterAtriumEnabled: boolean
   readonly isJoiningAtrium: boolean
   readonly onAccessKeyChange: (index: number, value: string) => void
@@ -18,7 +16,6 @@ export interface JoinSessionSectionProps {
 
 export function JoinSessionSection({
   accessKey,
-  inputRefs,
   isEnterAtriumEnabled,
   isJoiningAtrium,
   onAccessKeyChange,
@@ -52,9 +49,6 @@ export function JoinSessionSection({
             {accessKey.map((digit, idx) => (
               <Input
                 key={idx}
-                ref={(el) => {
-                  inputRefs.current[idx] = el
-                }}
                 data-testid={`access-key-input-${idx}`}
                 className="w-12 h-14 bg-muted text-center text-2xl font-bold text-secondary px-0"
                 inputMode="numeric"
@@ -85,4 +79,3 @@ export function JoinSessionSection({
     </Card>
   )
 }
-

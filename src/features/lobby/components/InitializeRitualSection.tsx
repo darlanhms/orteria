@@ -1,11 +1,17 @@
 import { DeckOptionCard } from "./DeckOptionCard"
-import type { LobbyDeck } from "../useTaskScorerLobbyController"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { lobbyDeckOptions } from "@/data/mockData"
+
+export type LobbyDeck = "Fibonacci" | "T-Shirt" | "Linear"
+
+const lobbyDeckOptions = [
+  { id: "Fibonacci" as const, title: "Fibonacci", description: "0, 1, 2, 3, 5, 8, 13...", icon: "functions" },
+  { id: "T-Shirt" as const, title: "Camiseta", description: "RN, PP, P, M, G, GG, XGG", icon: "apparel" },
+  { id: "Linear" as const, title: "Linear", description: "1, 2, 3, 4, 5, 6, 7...", icon: "linear_scale" },
+]
 
 export interface InitializeRitualSectionProps {
   readonly sessionIdentity: string
@@ -89,4 +95,3 @@ export function InitializeRitualSection({
     </Card>
   )
 }
-

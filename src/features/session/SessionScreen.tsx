@@ -1,7 +1,7 @@
 import { ParticipantsPanel } from "./components/ParticipantsPanel"
 import { VoteOptionCard } from "./components/VoteOptionCard"
-import { useSessionController } from "./useSessionController"
-import type { MockVoteOptionId, SessionVoteOption } from "./useSessionController"
+import type { SessionVoteOption } from "./components/VoteOptionCard"
+import type { SessionParticipant } from "./components/ParticipantsPanel"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,44 +11,46 @@ export interface SessionScreenProps {
   readonly sessionId: string
 }
 
-function VoteGrid({
-  voteOptions,
-  selectedVoteId,
-  isRevealed,
-  onSelectVote,
-}: {
-  readonly voteOptions: ReadonlyArray<SessionVoteOption>
-  readonly selectedVoteId: MockVoteOptionId | null
-  readonly isRevealed: boolean
-  readonly onSelectVote: (id: MockVoteOptionId) => void
-}) {
+const stubVoteOptions: ReadonlyArray<SessionVoteOption> = [
+  { id: "RN", label: "RN", sizingLabel: "EXTRA PEQUENO" },
+  { id: "PP", label: "PP", sizingLabel: "PEQUENO" },
+  { id: "P", label: "P", sizingLabel: "MÉDIO-PEQUENO" },
+  { id: "M", label: "M", sizingLabel: "MÉDIO" },
+  { id: "G", label: "G", sizingLabel: "GRANDE" },
+  { id: "GG", label: "GG", sizingLabel: "EXTRA GRANDE" },
+  { id: "XGG", label: "XGG", sizingLabel: "EPICO" },
+]
+
+const stubParticipants: ReadonlyArray<SessionParticipant> = [
+  { id: "alex-chen", name: "Alex Chen", role: "LEAD ARCHITECT", status: "PRONTO" },
+  { id: "sarah-j", name: "Sarah Jenkins", role: "DEVOPS", status: "PENSANDO..." },
+  { id: "marcus-v", name: "Marcus Voe", role: "BACKEND", status: "PRONTO" },
+  { id: "john-doe", name: "John Doe (Você)", role: "FULLSTACK", status: "VOTADO" },
+]
+
+const stubSession = {
+  title: "Refatorar Payment Gateway Microservice",
+  description:
+    "Refine a lógica transacional com controle total de sentenças e melhora do tratamento de erros.",
+}
+
+function VoteGrid({ voteOptions }: { readonly voteOptions: ReadonlyArray<SessionVoteOption> }) {
   return (
     <div className="grid grid-cols-4 gap-4">
       {voteOptions.map((opt) => (
         <VoteOptionCard
           key={opt.id}
           option={opt}
-          isSelected={selectedVoteId === opt.id}
-          isDisabled={isRevealed}
-          onSelect={() => onSelectVote(opt.id)}
+          isSelected={false}
+          isDisabled={false}
+          onSelect={() => {}}
         />
       ))}
     </div>
   )
 }
 
-export function SessionScreen({ sessionId }: SessionScreenProps) {
-  const {
-    session,
-    isRevealed,
-    selectedVoteId,
-    voteOptions,
-    participants,
-    handleSelectVote,
-    handleRevealVotes,
-    handleResetRound,
-  } = useSessionController(sessionId)
-
+export function SessionScreen({ sessionId: _sessionId }: SessionScreenProps) {
   return (
     <div className="min-h-svh bg-background text-foreground selection:bg-secondary selection:text-secondary-foreground">
       <TopNavBar activeTab="Vote" onTabChange={() => {}} />
@@ -61,10 +63,10 @@ export function SessionScreen({ sessionId }: SessionScreenProps) {
             <Card className="bg-card/70 border-border/10 mb-6">
               <CardHeader>
                 <CardTitle className="text-3xl font-extrabold tracking-tight text-foreground">
-                  {session.title}
+                  {stubSession.title}
                 </CardTitle>
                 <CardDescription className="max-w-md">
-                  {session.description}
+                  {stubSession.description}
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -76,32 +78,21 @@ export function SessionScreen({ sessionId }: SessionScreenProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-
-                <VoteGrid
-                  voteOptions={voteOptions}
-                  selectedVoteId={selectedVoteId}
-                  isRevealed={isRevealed}
-                  onSelectVote={handleSelectVote}
-                />
+                <VoteGrid voteOptions={stubVoteOptions} />
 
                 <Button
                   size="lg"
-                  onClick={isRevealed ? handleResetRound : handleRevealVotes}
-                  className={[
-                    "w-full mt-6 h-auto py-4 text-lg",
-                    isRevealed
-                      ? "bg-primary/70 text-primary-foreground hover:bg-primary/60"
-                      : "",
-                  ].join(" ")}
+                  onClick={() => {}}
+                  className="w-full mt-6 h-auto py-4 text-lg"
                 >
-                  {isRevealed ? "Repensar" : "Pronto"}
+                  Pronto
                 </Button>
               </CardContent>
             </Card>
           </section>
 
           <div className="lg:col-span-5 space-y-6">
-            <ParticipantsPanel participants={participants} />
+            <ParticipantsPanel participants={stubParticipants} />
           </div>
         </div>
       </main>
@@ -110,4 +101,3 @@ export function SessionScreen({ sessionId }: SessionScreenProps) {
     </div>
   )
 }
-
