@@ -15,6 +15,8 @@ Try to be as consistent as possible between one screen and another and not creat
 
 If a component is not found at shadcn, use https://coss.com/origin to find a more suitable component.
 
+When creating a new form or form-like component, ALWAYS use shadcn pattern for form fields, NEVER create all form components independently
+
 ## Convex with tanstack query
 - On client side, NEVER user convex functions directly, ALWAYS use it considering the following doc https://docs.convex.dev/client/tanstack/tanstack-query
 

@@ -372,6 +372,7 @@ export const getSessionScreenData = query({
 
     const participants = ritualMembers.map((member) => {
       const hasVoted = votesByUserId[member.userId] ?? false;
+      const isCurrentUser = member.userId === currentUserId;
       const status: "PRONTO" | "PENSANDO..." | "VOTADO" = member.canVote
         ? hasVoted
           ? "VOTADO"
@@ -380,11 +381,12 @@ export const getSessionScreenData = query({
             : "PRONTO"
         : "PRONTO";
 
-      const displayName = member.name?.trim() || `Membro ${member.userId.slice(0, 6)}`;
+      const displayName = member.name?.trim() || (isCurrentUser ? "Você" : `Membro ${member.userId.slice(0, 6)}`);
 
       return {
         id: member._id,
         name: displayName,
+        isCurrentUser,
         role: member.canVote ? member.role : `${member.role} (Espectador)`,
         status,
       };
@@ -526,6 +528,38 @@ export const joinRitual = mutation({
     });
 
     return { joined: true, alreadyMember: false };
+  },
+});
+
+export const updateMyRitualMemberData = mutation({
+  args: {
+    ritualId: v.id("rituals"),
+    memberName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuthenticatedUser(ctx);
+    const memberName = args.memberName.trim();
+    if (memberName.length === 0) {
+      throw new Error("Member name is required");
+    }
+
+    const member = await ctx.db
+      .query("ritualMembers")
+      .withIndex("by_ritualId_and_userId", (q) =>
+        q.eq("ritualId", args.ritualId).eq("userId", userId),
+      )
+      .unique();
+
+    if (!member) {
+      throw new Error("Unauthorized");
+    }
+
+    await ctx.db.patch(member._id, {
+      name: memberName,
+      lastSeenAt: Date.now(),
+    });
+
+    return { updated: true };
   },
 });
 

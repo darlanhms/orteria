@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { convexQuery, useConvexMutation } from "@convex-dev/react-query"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
+import { EditRitualMemberDataDialog } from "./components/EditRitualMemberDataDialog"
 import { ParticipantsPanel } from "./components/ParticipantsPanel"
 import { NewVotingSessionModal } from "./components/NewVotingSessionModal"
 import { VoteOptionCard } from "./components/VoteOptionCard"
@@ -57,6 +58,8 @@ export function SessionScreen({
   const navigate = useNavigate()
   const [selectedVote, setSelectedVote] = useState<string | null>(null)
   const [joinMemberName, setJoinMemberName] = useState("")
+  const [initialMemberNameForEdit, setInitialMemberNameForEdit] = useState("")
+  const [isEditMemberNameOpen, setIsEditMemberNameOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [hasDismissedAutoModal, setHasDismissedAutoModal] = useState(false)
   const submitVote = useMutation({
@@ -221,7 +224,6 @@ export function SessionScreen({
   }
 
   const data = sessionData
-
   const isVotingOpen =
     data.currentVotingSessionStatus === "PENDING" &&
     Boolean(data.currentVotingSessionId) &&
@@ -276,6 +278,12 @@ export function SessionScreen({
         onSessionCreated={() => {
           setHasDismissedAutoModal(false)
         }}
+      />
+      <EditRitualMemberDataDialog
+        open={isEditMemberNameOpen}
+        ritualId={sessionId as Id<"rituals">}
+        initialMemberName={initialMemberNameForEdit}
+        onOpenChange={setIsEditMemberNameOpen}
       />
 
       <main className="max-w-7xl mx-auto px-6 py-4 lg:py-8">
@@ -344,6 +352,10 @@ export function SessionScreen({
           <div className="lg:col-span-5 space-y-6">
             <ParticipantsPanel
               participants={data.participants}
+              onEditSelfName={(currentName) => {
+                setInitialMemberNameForEdit(currentName)
+                setIsEditMemberNameOpen(true)
+              }}
               headerAction={
                 data.canManageSessions && !data.currentVotingSessionId ? (
                   <Button

@@ -7,6 +7,7 @@ export type SessionParticipantStatus = "PRONTO" | "PENSANDO..." | "VOTADO"
 export type SessionParticipant = {
   readonly id: string
   readonly name: string
+  readonly isCurrentUser: boolean
   readonly role: string
   readonly status: SessionParticipantStatus
 }
@@ -14,6 +15,7 @@ export type SessionParticipant = {
 export interface ParticipantsPanelProps {
   readonly participants: ReadonlyArray<SessionParticipant>
   readonly headerAction?: ReactNode
+  readonly onEditSelfName?: (currentName: string) => void
 }
 
 function AvatarInitials({ name }: { readonly name: string }) {
@@ -37,6 +39,7 @@ function AvatarInitials({ name }: { readonly name: string }) {
 export function ParticipantsPanel({
   participants,
   headerAction,
+  onEditSelfName,
 }: ParticipantsPanelProps) {
   return (
     <Card className="bg-card/60 border-border/10">
@@ -47,9 +50,17 @@ export function ParticipantsPanel({
 
       <CardContent className="space-y-3">
         {participants.map((p) => (
-          <div
+          <button
             key={p.id}
-            className="flex items-center gap-3 p-3 rounded-lg bg-card/70 border border-border/10"
+            type="button"
+            onClick={() => {
+              if (!p.isCurrentUser) return
+              onEditSelfName?.(p.name)
+            }}
+            className={cn(
+              "flex w-full items-center gap-3 p-3 rounded-lg bg-card/70 border border-border/10 text-left",
+              p.isCurrentUser && "cursor-pointer hover:border-primary/40 transition-colors",
+            )}
           >
             <AvatarInitials name={p.name} />
             <div className="min-w-0 flex-1">
@@ -68,7 +79,7 @@ export function ParticipantsPanel({
             >
               {p.status}
             </div>
-          </div>
+          </button>
         ))}
       </CardContent>
     </Card>
