@@ -242,6 +242,7 @@ export const createVotingSessionFromTitle = mutation({
   args: {
     ritualId: v.id("rituals"),
     sessionName: v.string(),
+    externalUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await requireAuthenticatedUser(ctx);
@@ -251,6 +252,20 @@ export const createVotingSessionFromTitle = mutation({
     const sessionName = args.sessionName.trim();
     if (sessionName.length === 0) {
       throw new Error("Session name is required");
+    }
+    const externalUrl = args.externalUrl?.trim() || undefined;
+    if (externalUrl) {
+      if (externalUrl.length > 2048) {
+        throw new Error("External URL is too long");
+      }
+      try {
+        const parsed = new URL(externalUrl);
+        if (!["http:", "https:"].includes(parsed.protocol)) {
+          throw new Error("Invalid URL protocol");
+        }
+      } catch {
+        throw new Error("External URL must be a valid http(s) URL");
+      }
     }
 
     const pendingSession = await ctx.db
@@ -275,6 +290,7 @@ export const createVotingSessionFromTitle = mutation({
     const taskId = await ctx.db.insert("tasks", {
       ritualId: args.ritualId,
       title: sessionName,
+      externalRef: externalUrl,
       status: "OPEN",
       createdAt: now,
     });
@@ -388,6 +404,7 @@ export const getSessionScreenData = query({
       currentVotingSessionId: currentVotingSession?._id ?? null,
       currentVotingSessionStatus: currentVotingSession?.status ?? null,
       currentSessionName: currentTask?.title ?? null,
+      currentSessionExternalUrl: currentTask?.externalRef ?? null,
       canManageSessions:
         membership.role === "OWNER" || membership.role === "ADMIN",
       voteProgress: currentVotingSession
@@ -523,6 +540,32 @@ export const revealVotingSession = mutation({
     });
 
     return { status: "REVEALED" as const };
+  },
+});
+
+export const finalizeVotingSession = mutation({
+  args: {
+    sessionId: v.id("votingSessions"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuthenticatedUser(ctx);
+    const session = await getSessionOrThrow(ctx, args.sessionId);
+    const member = await getRitualMember(ctx, session.ritualId, userId);
+    requireRitualAdmin(member);
+
+    if (session.status === "DONE" || session.status === "CANCELLED") {
+      return { status: session.status };
+    }
+
+    requireOpenStatus(session.status);
+    await assertAllVotesSubmitted(ctx, session);
+
+    await ctx.db.patch(session._id, {
+      status: "DONE",
+      closedAt: Date.now(),
+    });
+
+    return { status: "DONE" as const };
   },
 });
 

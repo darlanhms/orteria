@@ -54,6 +54,9 @@ export function SessionScreen({
       setSelectedVote(null)
     },
   })
+  const finalizeVotingSession = useMutation({
+    mutationFn: useConvexMutation(api.ritualVoting.finalizeVotingSession),
+  })
   const { data: sessionData, isPending } = useQuery(
     convexQuery(api.ritualVoting.getSessionScreenData, {
       ritualId: sessionId as Id<"rituals">,
@@ -98,6 +101,9 @@ export function SessionScreen({
     data.currentVotingSessionStatus === "PENDING" &&
     Boolean(data.currentVotingSessionId) &&
     !submitVote.isPending
+  const allVotesSubmitted =
+    (data.voteProgress?.totalVoters ?? 0) > 0 &&
+    (data.voteProgress?.submitted ?? 0) >= (data.voteProgress?.totalVoters ?? 0)
 
   async function handleSubmitVote() {
     if (!isVotingOpen || !selectedVote || !data.currentVotingSessionId) {
@@ -116,6 +122,17 @@ export function SessionScreen({
     if (!open && data.canManageSessions && !data.currentVotingSessionId) {
       setHasDismissedAutoModal(true)
     }
+  }
+
+  function handleFinalizeVotingSession() {
+    if (!data.currentVotingSessionId || !allVotesSubmitted) {
+      return
+    }
+
+    finalizeVotingSession.reset()
+    finalizeVotingSession.mutate({
+      sessionId: data.currentVotingSessionId,
+    })
   }
 
   return (
@@ -143,11 +160,26 @@ export function SessionScreen({
                 </CardTitle>
                 <CardDescription className="max-w-md">
                   {data.currentSessionName && data.currentVotingSessionStatus === "PENDING"
-                    ? `Aguardando votos (${data.voteProgress?.submitted ?? 0}/${data.voteProgress?.totalVoters ?? 0}).`
+                    ? allVotesSubmitted && data.canManageSessions
+                      ? "Todos os votos foram confirmados. O líder/admin já pode encerrar esta sessão."
+                      : `Aguardando votos (${data.voteProgress?.submitted ?? 0}/${data.voteProgress?.totalVoters ?? 0}).`
                     : data.currentVotingSessionStatus === "REVEALED"
                       ? "Votos revelados. O líder/admin pode reabrir a rodada em caso de discrepância."
                       : "Aguardando o líder criar uma nova sessão..."}
                 </CardDescription>
+                {data.currentSessionExternalUrl && (
+                  <a
+                    href={data.currentSessionExternalUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex w-fit items-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/15"
+                  >
+                    <span className="material-symbols-outlined text-base leading-none" aria-hidden="true">
+                      open_in_new
+                    </span>
+                    Abrir item externo
+                  </a>
+                )}
                 {data.canManageSessions && !data.currentVotingSessionId && (
                   <div className="pt-2">
                     <Button
@@ -161,6 +193,21 @@ export function SessionScreen({
                     </Button>
                   </div>
                 )}
+                {data.canManageSessions &&
+                  data.currentVotingSessionId &&
+                  data.currentVotingSessionStatus === "PENDING" &&
+                  allVotesSubmitted && (
+                    <div className="pt-2">
+                      <Button
+                        onClick={handleFinalizeVotingSession}
+                        disabled={finalizeVotingSession.isPending}
+                      >
+                        {finalizeVotingSession.isPending
+                          ? "Finalizando..."
+                          : "Encerrar sessão de votação"}
+                      </Button>
+                    </div>
+                  )}
               </CardHeader>
             </Card>
 
@@ -180,6 +227,9 @@ export function SessionScreen({
 
                 {submitVote.error && (
                   <p className="text-sm text-destructive">{submitVote.error.message}</p>
+                )}
+                {finalizeVotingSession.error && (
+                  <p className="text-sm text-destructive">{finalizeVotingSession.error.message}</p>
                 )}
                 <Button
                   size="lg"
