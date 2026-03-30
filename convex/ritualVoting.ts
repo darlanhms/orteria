@@ -1,6 +1,14 @@
 import { v } from "convex/values";
+import { api, internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import {
+  action,
+  internalMutation,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 
 type VotingSessionStatus = Doc<"votingSessions">["status"];
 
@@ -27,13 +35,13 @@ const deckOptions = {
     { id: "13", label: "13", sizingLabel: "MUITO GRANDE" },
   ],
   "T-Shirt": [
-    { id: "RN", label: "RN", sizingLabel: "ATE 1 HORA" },
-    { id: "PP", label: "PP", sizingLabel: "1 A 4 HORAS | 1/2 DIA" },
-    { id: "P", label: "P", sizingLabel: "4 A 8 HORAS | 1 DIA" },
-    { id: "M", label: "M", sizingLabel: "8 A 16 HORAS | 2 DIAS" },
-    { id: "G", label: "G", sizingLabel: "16 A 24 HORAS | 3 DIAS" },
-    { id: "GG", label: "GG", sizingLabel: "24 A 40 HORAS | 5 DIAS" },
-    { id: "XGG", label: "XGG", sizingLabel: "MAIS QUE 40 HORAS | X DIAS" },
+    { id: "RN", label: "RN", sizingLabel: "ATE 1 HORA", clickUpOptionValue: "c8a84df7-0957-476d-9ddf-afadfa3aad88" },
+    { id: "PP", label: "PP", sizingLabel: "1 A 4 HORAS | 1/2 DIA", clickUpOptionValue: "77ed47da-ddb9-4d60-a13e-0884f7e6ed36" },
+    { id: "P", label: "P", sizingLabel: "4 A 8 HORAS | 1 DIA", clickUpOptionValue: "c97dcbcf-4831-4a3d-8a32-d82d6bae7d11" },
+    { id: "M", label: "M", sizingLabel: "8 A 16 HORAS | 2 DIAS", clickUpOptionValue: "003ab98d-124b-4137-92b7-dd5652732e74" },
+    { id: "G", label: "G", sizingLabel: "16 A 24 HORAS | 3 DIAS", clickUpOptionValue: "ac6dffd3-dc67-4146-89ed-0dfed8d534d7" },
+    { id: "GG", label: "GG", sizingLabel: "24 A 40 HORAS | 5 DIAS", clickUpOptionValue: "61c44ebf-6e61-4a80-b590-b1563ee901a3" },
+    { id: "XGG", label: "XGG", sizingLabel: "MAIS QUE 40 HORAS | X DIAS", clickUpOptionValue: "a5239881-574a-464d-8d84-d0dd6ccb37d4" },
   ],
   Linear: [
     { id: "1", label: "1", sizingLabel: "MUITO PEQUENO" },
@@ -45,6 +53,20 @@ const deckOptions = {
     { id: "7", label: "7", sizingLabel: "MUITO GRANDE" },
   ],
 } as const;
+
+function resolveClickUpScoreValue(
+  deckType: Doc<"rituals">["deckType"],
+  score: string,
+): string {
+  const option = deckOptions[deckType].find((deckOption) => deckOption.id === score);
+  if (!option) {
+    return score;
+  }
+  if ("clickUpOptionValue" in option && option.clickUpOptionValue) {
+    return option.clickUpOptionValue;
+  }
+  return score;
+}
 
 async function requireAuthenticatedUser(ctx: MutationCtx): Promise<string> {
   const identity = await ctx.auth.getUserIdentity();
@@ -776,7 +798,12 @@ export const finalizeVotingSession = mutation({
     requireRitualAdmin(member);
 
     if (session.status === "DONE" || session.status === "CANCELLED") {
-      return { status: session.status };
+      const task = await ctx.db.get(session.taskId);
+      return {
+        status: session.status,
+        clickUpId: task?.clickUpId ?? null,
+        clickUpScoreValue: session.finalScore ?? null,
+      };
     }
 
     requireOpenStatus(session.status);
@@ -791,7 +818,7 @@ export const finalizeVotingSession = mutation({
   },
 });
 
-export const closeVotingSession = mutation({
+export const closeVotingSessionInternal = internalMutation({
   args: {
     sessionId: v.id("votingSessions"),
     finalScore: v.string(),
@@ -803,7 +830,12 @@ export const closeVotingSession = mutation({
     requireRitualAdmin(member);
 
     if (session.status === "DONE" || session.status === "CANCELLED") {
-      return { status: session.status };
+      const task = await ctx.db.get(session.taskId);
+      return {
+        status: session.status,
+        clickUpId: task?.clickUpId ?? null,
+        clickUpScoreValue: session.finalScore ?? null,
+      };
     }
 
     if (session.status !== "REVEALED") {
@@ -817,13 +849,48 @@ export const closeVotingSession = mutation({
 
     requireValidScore(ritual.deckType, args.finalScore);
 
+    const task = await ctx.db.get(session.taskId);
+    if (!task) {
+      throw new Error("Task not found");
+    }
+
     await ctx.db.patch(session._id, {
       status: "DONE",
       finalScore: args.finalScore,
       closedAt: Date.now(),
     });
 
-    return { status: "DONE" as const };
+    return {
+      status: "DONE" as const,
+      clickUpId: task.clickUpId ?? null,
+      clickUpScoreValue: resolveClickUpScoreValue(ritual.deckType, args.finalScore),
+    };
+  },
+});
+
+export const closeVotingSession = action({
+  args: {
+    sessionId: v.id("votingSessions"),
+    finalScore: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const result: {
+      status: "DONE" | "CANCELLED";
+      clickUpId: string | null;
+      clickUpScoreValue: string | null;
+    } = await ctx.runMutation(internal.ritualVoting.closeVotingSessionInternal, {
+      sessionId: args.sessionId,
+      finalScore: args.finalScore,
+    });
+
+    if (result.status === "DONE" && result.clickUpId && result.clickUpScoreValue) {
+      await ctx.runAction(api.clickup.setClickUpCustomFieldValue, {
+        taskId: result.clickUpId,
+        value: result.clickUpScoreValue,
+      });
+    }
+
+    return { status: result.status };
   },
 });
 

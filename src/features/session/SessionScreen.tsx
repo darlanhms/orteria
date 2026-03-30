@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { convexQuery, useConvexMutation } from "@convex-dev/react-query"
+import { convexQuery, useConvexAction, useConvexMutation } from "@convex-dev/react-query"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { EditRitualMemberDataDialog } from "./components/EditRitualMemberDataDialog"
@@ -139,7 +139,7 @@ export function SessionScreen({
     mutationFn: useConvexMutation(api.ritualVoting.reopenVotingSession),
   })
   const closeVotingSession = useMutation({
-    mutationFn: useConvexMutation(api.ritualVoting.closeVotingSession),
+    mutationFn: useConvexAction(api.ritualVoting.closeVotingSession),
   })
   const joinRitual = useMutation({
     mutationFn: useConvexMutation(api.ritualVoting.joinRitual),
@@ -178,6 +178,22 @@ export function SessionScreen({
       setIsCreateModalOpen(true)
     }
   }, [sessionData, hasDismissedAutoModal])
+
+  useEffect(() => {
+    if (
+      !sessionData ||
+      sessionData.currentVotingSessionStatus !== "REVEALED" ||
+      !sessionData.currentVotingSessionId ||
+      !sessionData.results
+    ) {
+      setSelectedFinalScoreForClose(null)
+      return
+    }
+
+    setSelectedFinalScoreForClose(
+      sessionData.results.selectedFinalScore ?? sessionData.results.finalScore ?? null,
+    )
+  }, [sessionData])
 
   if (isAccessPending) {
     return (
@@ -317,19 +333,6 @@ export function SessionScreen({
     (data.currentVotingSessionStatus === "REVEALED" ||
       data.currentVotingSessionStatus === "DONE") &&
     Boolean(results)
-
-  useEffect(() => {
-    if (
-      data.currentVotingSessionStatus !== "REVEALED" ||
-      !results ||
-      !data.currentVotingSessionId
-    ) {
-      setSelectedFinalScoreForClose(null)
-      return
-    }
-
-    setSelectedFinalScoreForClose(results.selectedFinalScore ?? results.finalScore ?? null)
-  }, [data.currentVotingSessionId, data.currentVotingSessionStatus, results])
 
   async function handleSubmitVote() {
     if (!isVotingOpen || !selectedVote || !data.currentVotingSessionId) {
