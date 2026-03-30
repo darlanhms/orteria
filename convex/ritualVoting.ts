@@ -238,6 +238,60 @@ export const createVotingSession = mutation({
   },
 });
 
+export const createVotingSessionFromTitle = mutation({
+  args: {
+    ritualId: v.id("rituals"),
+    sessionName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuthenticatedUser(ctx);
+    const member = await getRitualMember(ctx, args.ritualId, userId);
+    requireRitualAdmin(member);
+
+    const sessionName = args.sessionName.trim();
+    if (sessionName.length === 0) {
+      throw new Error("Session name is required");
+    }
+
+    const pendingSession = await ctx.db
+      .query("votingSessions")
+      .withIndex("by_ritualId_and_status", (q) =>
+        q.eq("ritualId", args.ritualId).eq("status", "PENDING"),
+      )
+      .take(1);
+
+    const revealedSession = await ctx.db
+      .query("votingSessions")
+      .withIndex("by_ritualId_and_status", (q) =>
+        q.eq("ritualId", args.ritualId).eq("status", "REVEALED"),
+      )
+      .take(1);
+
+    if (pendingSession.length > 0 || revealedSession.length > 0) {
+      throw new Error("There is already an unfinished voting session");
+    }
+
+    const now = Date.now();
+    const taskId = await ctx.db.insert("tasks", {
+      ritualId: args.ritualId,
+      title: sessionName,
+      status: "OPEN",
+      createdAt: now,
+    });
+
+    const sessionId = await ctx.db.insert("votingSessions", {
+      ritualId: args.ritualId,
+      taskId,
+      createdBy: userId,
+      status: "PENDING",
+      autoRevealWhenAllVoted: false,
+      startedAt: now,
+    });
+
+    return { sessionId, taskId };
+  },
+});
+
 export const getSessionScreenData = query({
   args: {
     ritualId: v.id("rituals"),
@@ -334,6 +388,8 @@ export const getSessionScreenData = query({
       currentVotingSessionId: currentVotingSession?._id ?? null,
       currentVotingSessionStatus: currentVotingSession?.status ?? null,
       currentSessionName: currentTask?.title ?? null,
+      canManageSessions:
+        membership.role === "OWNER" || membership.role === "ADMIN",
       voteProgress: currentVotingSession
         ? {
             submitted: await countSubmittedVotesQuery(ctx, currentVotingSession._id),

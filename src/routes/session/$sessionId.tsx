@@ -8,7 +8,6 @@ export const Route = createFileRoute("/session/$sessionId")({
 
 function SessionRoute() {
   const { sessionId } = Route.useParams()
-
   return <SessionScreen sessionId={sessionId} />
 }
 

@@ -1,22 +1,23 @@
 import { useState } from "react"
-import { useMutation } from "convex/react"
+import { useMutation } from "@tanstack/react-query"
+import { useConvexMutation } from "@convex-dev/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { api } from "../../../convex/_generated/api"
+import { api } from "~convex/_generated/api"
 import { InitializeRitualSection, type InitializeRitualFormValues } from "./components/InitializeRitualSection"
 import { JoinSessionSection } from "./components/JoinSessionSection"
 import { TopNavBar } from "./components/TopNavBar"
 
 export function TaskScorerLobbyPage() {
   const navigate = useNavigate()
-  const createRitual = useMutation(api.ritualVoting.createRitual)
-  const [isManifesting, setIsManifesting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const createRitual = useMutation({
+    mutationFn: useConvexMutation(api.ritualVoting.createRitual),
+  })
 
   async function handleManifestSession(values: InitializeRitualFormValues) {
-    setIsManifesting(true)
     setSubmitError(null)
     try {
-      const { ritualId } = await createRitual({
+      const { ritualId } = await createRitual.mutateAsync({
         title: values.sessionIdentity,
         deckType: values.deckType,
       })
@@ -24,8 +25,6 @@ export function TaskScorerLobbyPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro ao iniciar ritual."
       setSubmitError(message)
-    } finally {
-      setIsManifesting(false)
     }
   }
 
@@ -47,7 +46,7 @@ export function TaskScorerLobbyPage() {
           />
 
           <InitializeRitualSection
-            isManifesting={isManifesting}
+            isManifesting={createRitual.isPending}
             submitError={submitError}
             onManifestSession={handleManifestSession}
           />

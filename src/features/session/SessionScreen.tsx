@@ -1,14 +1,16 @@
-import { useState } from "react"
-import { useMutation, useQuery } from "convex/react"
+import { useEffect, useState } from "react"
+import { convexQuery, useConvexMutation } from "@convex-dev/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { ParticipantsPanel } from "./components/ParticipantsPanel"
+import { NewVotingSessionModal } from "./components/NewVotingSessionModal"
 import { VoteOptionCard } from "./components/VoteOptionCard"
 import type { SessionVoteOption } from "./components/VoteOptionCard"
-import type { Id } from "../../../convex/_generated/dataModel"
+import type { Id } from "~convex/_generated/dataModel"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { TopNavBar } from "@/features/lobby/components/TopNavBar"
-import { api } from "../../../convex/_generated/api"
+import { api } from "~convex/_generated/api"
 
 export interface SessionScreenProps {
   readonly sessionId: string
@@ -40,16 +42,41 @@ function VoteGrid({
   )
 }
 
-export function SessionScreen({ sessionId }: SessionScreenProps) {
+export function SessionScreen({
+  sessionId,
+}: SessionScreenProps) {
   const [selectedVote, setSelectedVote] = useState<string | null>(null)
-  const [isSubmittingVote, setIsSubmittingVote] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
-  const submitVote = useMutation(api.ritualVoting.submitVote)
-  const sessionData = useQuery(api.ritualVoting.getSessionScreenData, {
-    ritualId: sessionId as Id<"rituals">,
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [hasDismissedAutoModal, setHasDismissedAutoModal] = useState(false)
+  const submitVote = useMutation({
+    mutationFn: useConvexMutation(api.ritualVoting.submitVote),
+    onSuccess: () => {
+      setSelectedVote(null)
+    },
   })
+  const { data: sessionData, isPending } = useQuery(
+    convexQuery(api.ritualVoting.getSessionScreenData, {
+      ritualId: sessionId as Id<"rituals">,
+    }),
+  )
 
-  if (sessionData === undefined) {
+  useEffect(() => {
+    if (!sessionData) {
+      return
+    }
+
+    if (sessionData.currentVotingSessionId) {
+      setHasDismissedAutoModal(false)
+      setIsCreateModalOpen(false)
+      return
+    }
+
+    if (sessionData.canManageSessions && !hasDismissedAutoModal) {
+      setIsCreateModalOpen(true)
+    }
+  }, [sessionData, hasDismissedAutoModal])
+
+  if (isPending) {
     return (
       <div className="min-h-svh bg-background text-foreground flex items-center justify-center">
         <p className="text-muted-foreground">Carregando sessão...</p>
@@ -65,36 +92,44 @@ export function SessionScreen({ sessionId }: SessionScreenProps) {
     )
   }
 
-  const data = sessionData
+  const data = sessionData as NonNullable<typeof sessionData>
+
   const isVotingOpen =
     data.currentVotingSessionStatus === "PENDING" &&
     Boolean(data.currentVotingSessionId) &&
-    !isSubmittingVote
+    !submitVote.isPending
 
   async function handleSubmitVote() {
     if (!isVotingOpen || !selectedVote || !data.currentVotingSessionId) {
       return
     }
 
-    setIsSubmittingVote(true)
-    setSubmitError(null)
-    try {
-      await submitVote({
-        sessionId: data.currentVotingSessionId,
-        score: selectedVote,
-      })
-      setSelectedVote(null)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Erro ao enviar voto."
-      setSubmitError(message)
-    } finally {
-      setIsSubmittingVote(false)
+    submitVote.reset()
+    submitVote.mutate({
+      sessionId: data.currentVotingSessionId,
+      score: selectedVote,
+    })
+  }
+
+  function handleCreateModalOpenChange(open: boolean) {
+    setIsCreateModalOpen(open)
+    if (!open && data.canManageSessions && !data.currentVotingSessionId) {
+      setHasDismissedAutoModal(true)
     }
   }
 
   return (
     <div className="min-h-svh bg-background text-foreground selection:bg-secondary selection:text-secondary-foreground">
       <TopNavBar ritualName={data.ritual.title} />
+
+      <NewVotingSessionModal
+        open={isCreateModalOpen}
+        ritualId={sessionId as Id<"rituals">}
+        onOpenChange={handleCreateModalOpenChange}
+        onSessionCreated={() => {
+          setHasDismissedAutoModal(false)
+        }}
+      />
 
       <main className="max-w-7xl mx-auto px-6 py-4 lg:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start mt-8">
@@ -111,8 +146,21 @@ export function SessionScreen({ sessionId }: SessionScreenProps) {
                     ? `Aguardando votos (${data.voteProgress?.submitted ?? 0}/${data.voteProgress?.totalVoters ?? 0}).`
                     : data.currentVotingSessionStatus === "REVEALED"
                       ? "Votos revelados. O líder/admin pode reabrir a rodada em caso de discrepância."
-                      : "Sem sessão ativa no momento."}
+                      : "Aguardando o líder criar uma nova sessão..."}
                 </CardDescription>
+                {data.canManageSessions && !data.currentVotingSessionId && (
+                  <div className="pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setHasDismissedAutoModal(false)
+                        setIsCreateModalOpen(true)
+                      }}
+                    >
+                      Criar nova sessão
+                    </Button>
+                  </div>
+                )}
               </CardHeader>
             </Card>
 
@@ -130,8 +178,8 @@ export function SessionScreen({ sessionId }: SessionScreenProps) {
                   isVotingOpen={isVotingOpen}
                 />
 
-                {submitError && (
-                  <p className="text-sm text-destructive">{submitError}</p>
+                {submitVote.error && (
+                  <p className="text-sm text-destructive">{submitVote.error.message}</p>
                 )}
                 <Button
                   size="lg"
@@ -140,11 +188,11 @@ export function SessionScreen({ sessionId }: SessionScreenProps) {
                     !data.currentVotingSessionId ||
                     data.currentVotingSessionStatus !== "PENDING" ||
                     !selectedVote ||
-                    isSubmittingVote
+                    submitVote.isPending
                   }
                   className="w-full mt-6 h-auto py-4 text-lg"
                 >
-                  {isSubmittingVote ? "Enviando..." : "Pronto"}
+                  {submitVote.isPending ? "Enviando..." : "Pronto"}
                 </Button>
               </CardContent>
             </Card>
