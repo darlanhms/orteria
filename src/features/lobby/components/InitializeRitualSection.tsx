@@ -13,6 +13,7 @@ const deckTypes = ["Fibonacci", "T-Shirt", "Linear"] as const
 
 const initializeRitualSchema = z.object({
   sessionIdentity: z.string().trim().min(1, "Informe o nome da sessão"),
+  memberName: z.string().trim().min(1, "Informe seu nome no ritual"),
   deckType: z.enum(deckTypes),
 })
 
@@ -46,6 +47,7 @@ export function InitializeRitualSection({
     mode: "onChange",
     defaultValues: {
       sessionIdentity: "",
+      memberName: "",
       deckType: "Fibonacci",
     },
   })
@@ -74,16 +76,29 @@ export function InitializeRitualSection({
         {/* Session identity */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-            <Label>
-              Nome da Sessão
-            </Label>
-            <Input
-              className="h-12 bg-muted px-4 text-base"
-              placeholder="Sprint 42: O Despertar"
-              {...register("sessionIdentity")}
-            />
+              <Label>
+                Nome da Sessão
+              </Label>
+              <Input
+                className="h-12 bg-muted px-4 text-base"
+                placeholder="Sprint 42: O Despertar"
+                {...register("sessionIdentity")}
+              />
               {errors.sessionIdentity && (
                 <p className="text-sm text-destructive">{errors.sessionIdentity.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>
+                Seu Nome no Ritual
+              </Label>
+              <Input
+                className="h-12 bg-muted px-4 text-base"
+                placeholder="Ex: Darlan"
+                {...register("memberName")}
+              />
+              {errors.memberName && (
+                <p className="text-sm text-destructive">{errors.memberName.message}</p>
               )}
             </div>
           </div>

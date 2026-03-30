@@ -380,10 +380,7 @@ export const getSessionScreenData = query({
             : "PRONTO"
         : "PRONTO";
 
-      const displayName =
-        member.userId === currentUserId
-          ? "Você"
-          : `Membro ${member.userId.slice(0, 6)}`;
+      const displayName = member.name?.trim() || `Membro ${member.userId.slice(0, 6)}`;
 
       return {
         id: member._id,
@@ -417,18 +414,54 @@ export const getSessionScreenData = query({
   },
 });
 
+export const getRitualAccess = query({
+  args: {
+    ritualId: v.id("rituals"),
+  },
+  handler: async (ctx, args) => {
+    const currentUserId = await requireAuthenticatedUserQuery(ctx);
+    const ritual = await ctx.db.get(args.ritualId);
+
+    if (!ritual) {
+      return {
+        ritualExists: false,
+        ritualTitle: null,
+        isMember: false,
+      };
+    }
+
+    const membership = await ctx.db
+      .query("ritualMembers")
+      .withIndex("by_ritualId_and_userId", (q) =>
+        q.eq("ritualId", args.ritualId).eq("userId", currentUserId),
+      )
+      .unique();
+
+    return {
+      ritualExists: true,
+      ritualTitle: ritual.title,
+      isMember: Boolean(membership),
+    };
+  },
+});
+
 export const createRitual = mutation({
   args: {
     title: v.string(),
     deckType: ritualDeckTypeValidator,
+    memberName: v.string(),
   },
   handler: async (ctx, args) => {
     const userId = await requireAuthenticatedUser(ctx);
     const now = Date.now();
     const title = args.title.trim();
+    const memberName = args.memberName.trim();
 
     if (title.length === 0) {
       throw new Error("Session name is required");
+    }
+    if (memberName.length === 0) {
+      throw new Error("Member name is required");
     }
 
     const ritualId = await ctx.db.insert("rituals", {
@@ -441,6 +474,7 @@ export const createRitual = mutation({
     await ctx.db.insert("ritualMembers", {
       ritualId,
       userId,
+      name: memberName,
       role: "OWNER",
       canVote: true,
       isOnline: true,
@@ -449,6 +483,49 @@ export const createRitual = mutation({
     });
 
     return { ritualId };
+  },
+});
+
+export const joinRitual = mutation({
+  args: {
+    ritualId: v.id("rituals"),
+    memberName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuthenticatedUser(ctx);
+    const ritual = await ctx.db.get(args.ritualId);
+    if (!ritual) {
+      throw new Error("Ritual not found");
+    }
+
+    const existingMember = await ctx.db
+      .query("ritualMembers")
+      .withIndex("by_ritualId_and_userId", (q) =>
+        q.eq("ritualId", args.ritualId).eq("userId", userId),
+      )
+      .unique();
+
+    if (existingMember) {
+      return { joined: false, alreadyMember: true };
+    }
+    const memberName = args.memberName.trim();
+    if (memberName.length === 0) {
+      throw new Error("Member name is required");
+    }
+
+    const now = Date.now();
+    await ctx.db.insert("ritualMembers", {
+      ritualId: args.ritualId,
+      userId,
+      name: memberName,
+      role: "MEMBER",
+      canVote: true,
+      isOnline: true,
+      joinedAt: now,
+      lastSeenAt: now,
+    });
+
+    return { joined: true, alreadyMember: false };
   },
 });
 

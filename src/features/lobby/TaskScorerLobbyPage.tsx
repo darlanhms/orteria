@@ -20,6 +20,7 @@ export function TaskScorerLobbyPage() {
       const { ritualId } = await createRitual.mutateAsync({
         title: values.sessionIdentity,
         deckType: values.deckType,
+        memberName: values.memberName,
       })
       await navigate({ to: "/session/$sessionId", params: { sessionId: ritualId } })
     } catch (error) {

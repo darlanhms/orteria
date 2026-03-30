@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { convexQuery, useConvexMutation } from "@convex-dev/react-query"
 import { useMutation, useQuery } from "@tanstack/react-query"
+import { useNavigate } from "@tanstack/react-router"
 import { ParticipantsPanel } from "./components/ParticipantsPanel"
 import { NewVotingSessionModal } from "./components/NewVotingSessionModal"
 import { VoteOptionCard } from "./components/VoteOptionCard"
@@ -9,6 +10,14 @@ import type { Id } from "~convex/_generated/dataModel"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { TopNavBar } from "@/features/lobby/components/TopNavBar"
 import { api } from "~convex/_generated/api"
 
@@ -45,7 +54,9 @@ function VoteGrid({
 export function SessionScreen({
   sessionId,
 }: SessionScreenProps) {
+  const navigate = useNavigate()
   const [selectedVote, setSelectedVote] = useState<string | null>(null)
+  const [joinMemberName, setJoinMemberName] = useState("")
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [hasDismissedAutoModal, setHasDismissedAutoModal] = useState(false)
   const submitVote = useMutation({
@@ -57,10 +68,26 @@ export function SessionScreen({
   const finalizeVotingSession = useMutation({
     mutationFn: useConvexMutation(api.ritualVoting.finalizeVotingSession),
   })
-  const { data: sessionData, isPending, isError, error } = useQuery(
-    convexQuery(api.ritualVoting.getSessionScreenData, {
+  const joinRitual = useMutation({
+    mutationFn: useConvexMutation(api.ritualVoting.joinRitual),
+  })
+  const {
+    data: ritualAccessData,
+    isPending: isAccessPending,
+    isError: isAccessError,
+    error: accessError,
+  } = useQuery(
+    convexQuery(api.ritualVoting.getRitualAccess, {
       ritualId: sessionId as Id<"rituals">,
     }),
+  )
+  const { data: sessionData, isPending, isError, error } = useQuery(
+    {
+      ...convexQuery(api.ritualVoting.getSessionScreenData, {
+        ritualId: sessionId as Id<"rituals">,
+      }),
+      enabled: ritualAccessData?.isMember === true,
+    },
   )
 
   useEffect(() => {
@@ -79,6 +106,88 @@ export function SessionScreen({
     }
   }, [sessionData, hasDismissedAutoModal])
 
+  if (isAccessPending) {
+    return (
+      <div className="min-h-svh bg-background text-foreground flex items-center justify-center">
+        <p className="text-muted-foreground">Carregando sessão...</p>
+      </div>
+    )
+  }
+
+  if (isAccessError) {
+    return (
+      <div className="min-h-svh bg-background text-foreground flex items-center justify-center">
+        <p className="text-muted-foreground">{accessError.message}</p>
+      </div>
+    )
+  }
+
+  if (!ritualAccessData?.ritualExists) {
+    return (
+      <div className="min-h-svh bg-background text-foreground flex items-center justify-center">
+        <p className="text-muted-foreground">Sessão não encontrada.</p>
+      </div>
+    )
+  }
+
+  if (!ritualAccessData.isMember) {
+    return (
+      <div className="min-h-svh bg-background text-foreground">
+        <TopNavBar ritualName={ritualAccessData.ritualTitle} />
+        <Dialog open>
+          <DialogContent showCloseButton={false}>
+            <DialogHeader>
+              <DialogTitle>Entrar neste ritual?</DialogTitle>
+              <DialogDescription>
+                Você ainda não participa do ritual{" "}
+                <span className="font-semibold text-foreground">
+                  "{ritualAccessData.ritualTitle}"
+                </span>
+                . Deseja entrar como membro?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <label htmlFor="join-member-name" className="text-sm font-medium">
+                Nome no ritual
+              </label>
+              <input
+                id="join-member-name"
+                value={joinMemberName}
+                onChange={(event) => setJoinMemberName(event.target.value)}
+                placeholder="Ex: Darlan"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              />
+            </div>
+            {joinRitual.error && (
+              <p className="text-sm text-destructive">{joinRitual.error.message}</p>
+            )}
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => navigate({ to: "/" })}
+                disabled={joinRitual.isPending}
+              >
+                Agora não
+              </Button>
+              <Button
+                onClick={() => {
+                  joinRitual.reset()
+                  joinRitual.mutate({
+                    ritualId: sessionId as Id<"rituals">,
+                    memberName: joinMemberName,
+                  })
+                }}
+                disabled={joinRitual.isPending || joinMemberName.trim().length === 0}
+              >
+                {joinRitual.isPending ? "Entrando..." : "Entrar no ritual"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    )
+  }
+
   if (isPending) {
     return (
       <div className="min-h-svh bg-background text-foreground flex items-center justify-center">
@@ -87,18 +196,18 @@ export function SessionScreen({
     )
   }
 
-  if (sessionData === null) {
-    return (
-      <div className="min-h-svh bg-background text-foreground flex items-center justify-center">
-        <p className="text-muted-foreground">Sessão não encontrada.</p>
-      </div>
-    )
-  }
-
   if (isError) {
     return (
       <div className="min-h-svh bg-background text-foreground flex items-center justify-center">
         <p className="text-muted-foreground">{error.message}</p>
+      </div>
+    )
+  }
+
+  if (sessionData === null) {
+    return (
+      <div className="min-h-svh bg-background text-foreground flex items-center justify-center">
+        <p className="text-muted-foreground">Sessão não encontrada.</p>
       </div>
     )
   }

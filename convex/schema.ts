@@ -42,6 +42,8 @@ export default defineSchema({
   ritualMembers: defineTable({
     ritualId: v.id("rituals"),
     userId: v.string(),
+    // Optional for backward compatibility with existing members.
+    name: v.optional(v.string()),
     role: ritualMemberRole,
     canVote: v.boolean(),
     isOnline: v.boolean(),
