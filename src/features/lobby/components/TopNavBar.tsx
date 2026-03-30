@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AuthDialog } from "@/components/AuthDialog"
 import { authClient } from "@/lib/auth-client"
 import logoSvg from "@/logo.svg"
@@ -50,45 +49,25 @@ function UserMenu() {
   )
 }
 
-export type LobbyTab = "Lobby" | "Vote" | "Board" | "History"
-
 export interface TopNavBarProps {
-  readonly activeTab: LobbyTab
-  readonly onTabChange: (tab: LobbyTab) => void
+  readonly ritualName?: string | null
 }
 
-const tabs: ReadonlyArray<LobbyTab> = ["Lobby", "Vote", "Board", "History"]
-const tabLabels: Readonly<Record<LobbyTab, string>> = {
-  Lobby: "Salão",
-  Vote: "Voto",
-  Board: "Quadro",
-  History: "Histórico",
-}
-
-export function TopNavBar({ activeTab, onTabChange }: TopNavBarProps) {
+export function TopNavBar({ ritualName }: TopNavBarProps) {
   return (
     <header className="w-full top-0 sticky z-50 bg-background/80 backdrop-blur">
       <nav className="flex justify-between items-center px-6 py-4 w-full max-w-none mx-auto">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <img src={logoSvg} alt="Hermes Scorer" className="h-8 w-8" />
-          <span className="text-2xl font-bold tracking-tight text-primary">
+          <span className="text-2xl font-bold tracking-tight text-primary shrink-0">
             Hermes Scorer
           </span>
+          {ritualName ? (
+            <span className="text-base text-foreground truncate max-w-[40vw] pl-3 border-l border-border/40 font-medium">
+              {ritualName}
+            </span>
+          ) : null}
         </div>
-
-        <Tabs
-          value={activeTab}
-          onValueChange={(tab) => onTabChange(tab as LobbyTab)}
-          className="hidden md:flex md:w-auto"
-        >
-          <TabsList className="gap-1">
-            {tabs.map((tab) => (
-              <TabsTrigger key={tab} value={tab} aria-label={tabLabels[tab]}>
-                {tabLabels[tab]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
 
         <UserMenu />
       </nav>

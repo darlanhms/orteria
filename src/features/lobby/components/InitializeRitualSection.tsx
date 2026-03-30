@@ -1,4 +1,7 @@
 import { DeckOptionCard } from "./DeckOptionCard"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import { z } from "zod"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -6,6 +9,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 export type LobbyDeck = "Fibonacci" | "T-Shirt" | "Linear"
+const deckTypes = ["Fibonacci", "T-Shirt", "Linear"] as const
+
+const initializeRitualSchema = z.object({
+  sessionIdentity: z.string().trim().min(1, "Informe o nome da sessão"),
+  deckType: z.enum(deckTypes),
+})
+
+export type InitializeRitualFormValues = z.infer<typeof initializeRitualSchema>
 
 const lobbyDeckOptions = [
   { id: "Fibonacci" as const, title: "Fibonacci", description: "0, 1, 2, 3, 5, 8, 13...", icon: "functions" },
@@ -14,24 +25,38 @@ const lobbyDeckOptions = [
 ]
 
 export interface InitializeRitualSectionProps {
-  readonly sessionIdentity: string
-  readonly selectedDeck: LobbyDeck
-  readonly canManifestSession: boolean
   readonly isManifesting: boolean
-  readonly onSessionIdentityChange: (value: string) => void
-  readonly onDeckSelect: (deck: LobbyDeck) => void
-  readonly onManifestSession: () => void
+  readonly submitError?: string | null
+  readonly onManifestSession: (values: InitializeRitualFormValues) => Promise<void>
 }
 
 export function InitializeRitualSection({
-  sessionIdentity,
-  selectedDeck,
-  canManifestSession,
   isManifesting,
-  onSessionIdentityChange,
-  onDeckSelect,
+  submitError,
   onManifestSession,
 }: InitializeRitualSectionProps) {
+  const {
+    register,
+    setValue,
+    watch,
+    handleSubmit,
+    formState: { errors, isValid },
+  } = useForm<InitializeRitualFormValues>({
+    resolver: zodResolver(initializeRitualSchema),
+    mode: "onChange",
+    defaultValues: {
+      sessionIdentity: "",
+      deckType: "Fibonacci",
+    },
+  })
+
+  const selectedDeck = watch("deckType")
+  const canManifestSession = isValid
+
+  const submit = handleSubmit(async (values) => {
+    await onManifestSession(values)
+  })
+
   return (
     <Card className="lg:col-span-7 border-t border-t-primary/20">
       <CardHeader className="pb-4">
@@ -44,25 +69,28 @@ export function InitializeRitualSection({
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-8">
+      <CardContent>
+        <form className="space-y-8" onSubmit={submit}>
         {/* Session identity */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
             <Label>
               Nome da Sessão
             </Label>
             <Input
               className="h-12 bg-muted px-4 text-base"
               placeholder="Sprint 42: O Despertar"
-              value={sessionIdentity}
-              onChange={(e) => onSessionIdentityChange(e.target.value)}
+              {...register("sessionIdentity")}
             />
+              {errors.sessionIdentity && (
+                <p className="text-sm text-destructive">{errors.sessionIdentity.message}</p>
+              )}
+            </div>
           </div>
-        </div>
 
         {/* Deck selection */}
-        <div className="space-y-4">
-          <Label>
+          <div className="space-y-4">
+            <Label>
             Tipo de Estimativa
           </Label>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -74,23 +102,29 @@ export function InitializeRitualSection({
                 description={opt.description}
                 icon={opt.icon}
                 isSelected={selectedDeck === opt.id}
-                onSelect={onDeckSelect}
+                onSelect={(deck) =>
+                  setValue("deckType", deck, { shouldDirty: true, shouldValidate: true })
+                }
               />
             ))}
           </div>
-        </div>
+          </div>
 
         {/* Manifest + participant avatars */}
-        <div className="pt-4 flex items-center justify-end">
-          <Button
-            size="lg"
-            disabled={!canManifestSession || isManifesting}
-            onClick={onManifestSession}
-            className="h-auto px-10 py-4 font-extrabold shadow-xl"
-          >
-            {isManifesting ? "Iniciando..." : "Iniciar"}
-          </Button>
-        </div>
+          {submitError && (
+            <p className="text-sm text-destructive">{submitError}</p>
+          )}
+          <div className="pt-4 flex items-center justify-end">
+            <Button
+              type="submit"
+              size="lg"
+              disabled={!canManifestSession || isManifesting}
+              className="h-auto px-10 py-4 font-extrabold shadow-xl"
+            >
+              {isManifesting ? "Iniciando..." : "Iniciar novo ritual"}
+            </Button>
+          </div>
+        </form>
       </CardContent>
     </Card>
   )

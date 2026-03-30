@@ -1,13 +1,38 @@
-import { InitializeRitualSection } from "./components/InitializeRitualSection"
+import { useState } from "react"
+import { useMutation } from "convex/react"
+import { useNavigate } from "@tanstack/react-router"
+import { api } from "../../../convex/_generated/api"
+import { InitializeRitualSection, type InitializeRitualFormValues } from "./components/InitializeRitualSection"
 import { JoinSessionSection } from "./components/JoinSessionSection"
 import { TopNavBar } from "./components/TopNavBar"
 
 export function TaskScorerLobbyPage() {
+  const navigate = useNavigate()
+  const createRitual = useMutation(api.ritualVoting.createRitual)
+  const [isManifesting, setIsManifesting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  async function handleManifestSession(values: InitializeRitualFormValues) {
+    setIsManifesting(true)
+    setSubmitError(null)
+    try {
+      const { ritualId } = await createRitual({
+        title: values.sessionIdentity,
+        deckType: values.deckType,
+      })
+      await navigate({ to: "/session/$sessionId", params: { sessionId: ritualId } })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao iniciar ritual."
+      setSubmitError(message)
+    } finally {
+      setIsManifesting(false)
+    }
+  }
+
   return (
     <div className="min-h-svh bg-background text-foreground selection:bg-secondary selection:text-secondary-foreground">
       <TopNavBar
-        activeTab="Lobby"
-        onTabChange={() => {}}
+        ritualName={null}
       />
 
       <main className="max-w-7xl mx-auto px-6 py-12 lg:py-20">
@@ -22,13 +47,9 @@ export function TaskScorerLobbyPage() {
           />
 
           <InitializeRitualSection
-            sessionIdentity=""
-            selectedDeck="Fibonacci"
-            canManifestSession={false}
-            isManifesting={false}
-            onSessionIdentityChange={() => {}}
-            onDeckSelect={() => {}}
-            onManifestSession={() => {}}
+            isManifesting={isManifesting}
+            submitError={submitError}
+            onManifestSession={handleManifestSession}
           />
         </div>
       </main>

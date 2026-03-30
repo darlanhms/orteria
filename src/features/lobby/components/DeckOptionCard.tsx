@@ -1,4 +1,4 @@
-import type { LobbyDeck } from "../useTaskScorerLobbyController"
+import type { LobbyDeck } from "./InitializeRitualSection"
 
 import { Button } from "@/components/ui/button"
 

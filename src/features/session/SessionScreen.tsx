@@ -1,59 +1,100 @@
+import { useState } from "react"
+import { useMutation, useQuery } from "convex/react"
 import { ParticipantsPanel } from "./components/ParticipantsPanel"
 import { VoteOptionCard } from "./components/VoteOptionCard"
 import type { SessionVoteOption } from "./components/VoteOptionCard"
-import type { SessionParticipant } from "./components/ParticipantsPanel"
+import type { Id } from "../../../convex/_generated/dataModel"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { TopNavBar } from "@/features/lobby/components/TopNavBar"
+import { api } from "../../../convex/_generated/api"
 
 export interface SessionScreenProps {
   readonly sessionId: string
 }
 
-const stubVoteOptions: ReadonlyArray<SessionVoteOption> = [
-  { id: "RN", label: "RN", sizingLabel: "EXTRA PEQUENO" },
-  { id: "PP", label: "PP", sizingLabel: "PEQUENO" },
-  { id: "P", label: "P", sizingLabel: "MÉDIO-PEQUENO" },
-  { id: "M", label: "M", sizingLabel: "MÉDIO" },
-  { id: "G", label: "G", sizingLabel: "GRANDE" },
-  { id: "GG", label: "GG", sizingLabel: "EXTRA GRANDE" },
-  { id: "XGG", label: "XGG", sizingLabel: "EPICO" },
-]
-
-const stubParticipants: ReadonlyArray<SessionParticipant> = [
-  { id: "alex-chen", name: "Alex Chen", role: "LEAD ARCHITECT", status: "PRONTO" },
-  { id: "sarah-j", name: "Sarah Jenkins", role: "DEVOPS", status: "PENSANDO..." },
-  { id: "marcus-v", name: "Marcus Voe", role: "BACKEND", status: "PRONTO" },
-  { id: "john-doe", name: "John Doe (Você)", role: "FULLSTACK", status: "VOTADO" },
-]
-
-const stubSession = {
-  title: "Refatorar Payment Gateway Microservice",
-  description:
-    "Refine a lógica transacional com controle total de sentenças e melhora do tratamento de erros.",
-}
-
-function VoteGrid({ voteOptions }: { readonly voteOptions: ReadonlyArray<SessionVoteOption> }) {
+function VoteGrid({
+  voteOptions,
+  selectedVote,
+  onSelectVote,
+  isVotingOpen,
+}: {
+  readonly voteOptions: ReadonlyArray<SessionVoteOption>
+  readonly selectedVote: string | null
+  readonly onSelectVote: (voteId: string) => void
+  readonly isVotingOpen: boolean
+}) {
   return (
     <div className="grid grid-cols-4 gap-4">
       {voteOptions.map((opt) => (
         <VoteOptionCard
           key={opt.id}
           option={opt}
-          isSelected={false}
-          isDisabled={false}
-          onSelect={() => {}}
+          isSelected={selectedVote === opt.id}
+          isDisabled={!isVotingOpen}
+          onSelect={() => onSelectVote(opt.id)}
         />
       ))}
     </div>
   )
 }
 
-export function SessionScreen({ sessionId: _sessionId }: SessionScreenProps) {
+export function SessionScreen({ sessionId }: SessionScreenProps) {
+  const [selectedVote, setSelectedVote] = useState<string | null>(null)
+  const [isSubmittingVote, setIsSubmittingVote] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const submitVote = useMutation(api.ritualVoting.submitVote)
+  const sessionData = useQuery(api.ritualVoting.getSessionScreenData, {
+    ritualId: sessionId as Id<"rituals">,
+  })
+
+  if (sessionData === undefined) {
+    return (
+      <div className="min-h-svh bg-background text-foreground flex items-center justify-center">
+        <p className="text-muted-foreground">Carregando sessão...</p>
+      </div>
+    )
+  }
+
+  if (sessionData === null) {
+    return (
+      <div className="min-h-svh bg-background text-foreground flex items-center justify-center">
+        <p className="text-muted-foreground">Sessão não encontrada.</p>
+      </div>
+    )
+  }
+
+  const data = sessionData
+  const isVotingOpen =
+    data.currentVotingSessionStatus === "PENDING" &&
+    Boolean(data.currentVotingSessionId) &&
+    !isSubmittingVote
+
+  async function handleSubmitVote() {
+    if (!isVotingOpen || !selectedVote || !data.currentVotingSessionId) {
+      return
+    }
+
+    setIsSubmittingVote(true)
+    setSubmitError(null)
+    try {
+      await submitVote({
+        sessionId: data.currentVotingSessionId,
+        score: selectedVote,
+      })
+      setSelectedVote(null)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao enviar voto."
+      setSubmitError(message)
+    } finally {
+      setIsSubmittingVote(false)
+    }
+  }
+
   return (
     <div className="min-h-svh bg-background text-foreground selection:bg-secondary selection:text-secondary-foreground">
-      <TopNavBar activeTab="Vote" onTabChange={() => {}} />
+      <TopNavBar ritualName={data.ritual.title} />
 
       <main className="max-w-7xl mx-auto px-6 py-4 lg:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start mt-8">
@@ -63,10 +104,14 @@ export function SessionScreen({ sessionId: _sessionId }: SessionScreenProps) {
             <Card className="bg-card/70 border-border/10 mb-6">
               <CardHeader>
                 <CardTitle className="text-3xl font-extrabold tracking-tight text-foreground">
-                  {stubSession.title}
+                  {data.currentSessionName ?? "Aguardando o líder criar uma nova sessão..."}
                 </CardTitle>
                 <CardDescription className="max-w-md">
-                  {stubSession.description}
+                  {data.currentSessionName && data.currentVotingSessionStatus === "PENDING"
+                    ? `Aguardando votos (${data.voteProgress?.submitted ?? 0}/${data.voteProgress?.totalVoters ?? 0}).`
+                    : data.currentVotingSessionStatus === "REVEALED"
+                      ? "Votos revelados. O líder/admin pode reabrir a rodada em caso de discrepância."
+                      : "Sem sessão ativa no momento."}
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -78,21 +123,35 @@ export function SessionScreen({ sessionId: _sessionId }: SessionScreenProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <VoteGrid voteOptions={stubVoteOptions} />
+                <VoteGrid
+                  voteOptions={data.voteOptions}
+                  selectedVote={selectedVote}
+                  onSelectVote={setSelectedVote}
+                  isVotingOpen={isVotingOpen}
+                />
 
+                {submitError && (
+                  <p className="text-sm text-destructive">{submitError}</p>
+                )}
                 <Button
                   size="lg"
-                  onClick={() => {}}
+                  onClick={handleSubmitVote}
+                  disabled={
+                    !data.currentVotingSessionId ||
+                    data.currentVotingSessionStatus !== "PENDING" ||
+                    !selectedVote ||
+                    isSubmittingVote
+                  }
                   className="w-full mt-6 h-auto py-4 text-lg"
                 >
-                  Pronto
+                  {isSubmittingVote ? "Enviando..." : "Pronto"}
                 </Button>
               </CardContent>
             </Card>
           </section>
 
           <div className="lg:col-span-5 space-y-6">
-            <ParticipantsPanel participants={stubParticipants} />
+            <ParticipantsPanel participants={data.participants} />
           </div>
         </div>
       </main>
