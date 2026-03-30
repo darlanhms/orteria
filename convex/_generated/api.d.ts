@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as clickup from "../clickup.js";
 import type * as http from "../http.js";
 import type * as ritualVoting from "../ritualVoting.js";
 
@@ -18,6 +19,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  clickup: typeof clickup;
   http: typeof http;
   ritualVoting: typeof ritualVoting;
 }>;

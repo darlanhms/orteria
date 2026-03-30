@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessionSessionIdRouteImport } from './routes/session/$sessionId'
-import { Route as ApiClickupTaskRouteImport } from './routes/api/clickup/task'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -24,11 +23,6 @@ const SessionSessionIdRoute = SessionSessionIdRouteImport.update({
   path: '/session/$sessionId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiClickupTaskRoute = ApiClickupTaskRouteImport.update({
-  id: '/api/clickup/task',
-  path: '/api/clickup/task',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -39,39 +33,30 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/session/$sessionId': typeof SessionSessionIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/clickup/task': typeof ApiClickupTaskRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/session/$sessionId': typeof SessionSessionIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/clickup/task': typeof ApiClickupTaskRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/session/$sessionId': typeof SessionSessionIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/clickup/task': typeof ApiClickupTaskRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/session/$sessionId' | '/api/auth/$' | '/api/clickup/task'
+  fullPaths: '/' | '/session/$sessionId' | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/session/$sessionId' | '/api/auth/$' | '/api/clickup/task'
-  id:
-    | '__root__'
-    | '/'
-    | '/session/$sessionId'
-    | '/api/auth/$'
-    | '/api/clickup/task'
+  to: '/' | '/session/$sessionId' | '/api/auth/$'
+  id: '__root__' | '/' | '/session/$sessionId' | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SessionSessionIdRoute: typeof SessionSessionIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
-  ApiClickupTaskRoute: typeof ApiClickupTaskRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -90,13 +75,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/clickup/task': {
-      id: '/api/clickup/task'
-      path: '/api/clickup/task'
-      fullPath: '/api/clickup/task'
-      preLoaderRoute: typeof ApiClickupTaskRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -111,7 +89,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SessionSessionIdRoute: SessionSessionIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
-  ApiClickupTaskRoute: ApiClickupTaskRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

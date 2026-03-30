@@ -60,6 +60,7 @@ export default defineSchema({
     title: v.string(),
     description: v.optional(v.string()),
     externalRef: v.optional(v.string()),
+    clickUpId: v.optional(v.string()),
     status: taskStatus,
     createdAt: v.number(),
   })
@@ -72,6 +73,7 @@ export default defineSchema({
     createdBy: v.string(),
     status: votingSessionStatus,
     autoRevealWhenAllVoted: v.boolean(),
+    finalScore: v.optional(v.string()),
     startedAt: v.number(),
     revealedAt: v.optional(v.number()),
     closedAt: v.optional(v.number()),
@@ -86,6 +88,11 @@ export default defineSchema({
     userId: v.string(),
     score: v.union(v.string(), v.null()),
     hasVoted: v.boolean(),
+    voteStatus: v.union(
+      v.literal("PRONTO"),
+      v.literal("PENSANDO"),
+      v.literal("VOTADO"),
+    ),
     votedAt: v.optional(v.number()),
   })
     .index("by_sessionId", ["sessionId"])

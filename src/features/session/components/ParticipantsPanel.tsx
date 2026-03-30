@@ -2,7 +2,7 @@ import type { ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
-export type SessionParticipantStatus = "PRONTO" | "PENSANDO..." | "VOTADO"
+export type SessionParticipantStatus = "PRONTO" | "PENSANDO" | "VOTADO"
 
 export type SessionParticipant = {
   readonly id: string

@@ -243,6 +243,7 @@ export const createVotingSessionFromTitle = mutation({
     ritualId: v.id("rituals"),
     sessionName: v.string(),
     externalUrl: v.optional(v.string()),
+    clickUpId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await requireAuthenticatedUser(ctx);
@@ -266,6 +267,10 @@ export const createVotingSessionFromTitle = mutation({
       } catch {
         throw new Error("External URL must be a valid http(s) URL");
       }
+    }
+    const clickUpId = args.clickUpId?.trim() || undefined;
+    if (clickUpId && !/^[a-zA-Z0-9_-]+$/.test(clickUpId)) {
+      throw new Error("Invalid ClickUp task id");
     }
 
     const pendingSession = await ctx.db
@@ -291,6 +296,7 @@ export const createVotingSessionFromTitle = mutation({
       ritualId: args.ritualId,
       title: sessionName,
       externalRef: externalUrl,
+      clickUpId,
       status: "OPEN",
       createdAt: now,
     });
@@ -349,6 +355,10 @@ export const getSessionScreenData = query({
         latestSessions.find((session) => session.status === "REVEALED") ?? null;
     }
     const votesByUserId: Record<string, boolean> = {};
+    const voteStatusByUserId: Record<string, "PRONTO" | "PENSANDO" | "VOTADO"> = {};
+    const voteScoreByUserId: Record<string, string | null> = {};
+    const scoreCounts: Record<string, number> = {};
+    let totalScoredVotes = 0;
 
     if (currentVotingSession) {
       const votes = await ctx.db
@@ -358,6 +368,12 @@ export const getSessionScreenData = query({
 
       for (const vote of votes) {
         votesByUserId[vote.userId] = vote.hasVoted;
+        voteStatusByUserId[vote.userId] = vote.voteStatus;
+        voteScoreByUserId[vote.userId] = vote.score;
+        if (vote.hasVoted && vote.score) {
+          scoreCounts[vote.score] = (scoreCounts[vote.score] ?? 0) + 1;
+          totalScoredVotes += 1;
+        }
       }
     }
 
@@ -369,16 +385,18 @@ export const getSessionScreenData = query({
       .query("ritualMembers")
       .withIndex("by_ritualId", (q) => q.eq("ritualId", args.ritualId))
       .collect();
+    const memberCanVoteByMemberId: Record<string, boolean> = {};
+    for (const member of ritualMembers) {
+      memberCanVoteByMemberId[member._id] = member.canVote;
+    }
 
     const participants = ritualMembers.map((member) => {
       const hasVoted = votesByUserId[member.userId] ?? false;
       const isCurrentUser = member.userId === currentUserId;
-      const status: "PRONTO" | "PENSANDO..." | "VOTADO" = member.canVote
-        ? hasVoted
-          ? "VOTADO"
-          : currentVotingSession?.status === "PENDING"
-            ? "PENSANDO..."
-            : "PRONTO"
+      const status: "PRONTO" | "PENSANDO" | "VOTADO" = member.canVote
+        ? currentVotingSession?.status === "PENDING"
+          ? voteStatusByUserId[member.userId] ?? (hasVoted ? "VOTADO" : "PENSANDO")
+          : "PRONTO"
         : "PRONTO";
 
       const displayName = member.name?.trim() || (isCurrentUser ? "Você" : `Membro ${member.userId.slice(0, 6)}`);
@@ -389,8 +407,43 @@ export const getSessionScreenData = query({
         isCurrentUser,
         role: member.canVote ? member.role : `${member.role} (Espectador)`,
         status,
+        voteScore: voteScoreByUserId[member.userId] ?? null,
       };
     });
+
+    const shouldShowResults =
+      currentVotingSession?.status === "REVEALED" || currentVotingSession?.status === "DONE";
+    const voteOptionOrder = deckOptions[ritual.deckType].map((option) => option.id);
+    const orderedDistribution = voteOptionOrder
+      .map((score) => ({ score, count: scoreCounts[score] ?? 0 }))
+      .filter((item) => item.count > 0);
+    const maxVoteCount = orderedDistribution.reduce((max, item) => Math.max(max, item.count), 0);
+    const topScores = orderedDistribution
+      .filter((item) => item.count === maxVoteCount)
+      .map((item) => item.score);
+    const hasTie = topScores.length > 1;
+    const winnerScore = !hasTie && topScores.length === 1 ? topScores[0] : null;
+    const agreementPercent =
+      totalScoredVotes > 0 && maxVoteCount > 0
+        ? Math.round((maxVoteCount / totalScoredVotes) * 100)
+        : 0;
+    const weightedSum = orderedDistribution.reduce((acc, item) => {
+      const scoreIndex = voteOptionOrder.indexOf(item.score);
+      return acc + (scoreIndex + 1) * item.count;
+    }, 0);
+    const averageScoreIndex =
+      totalScoredVotes > 0 ? Number((weightedSum / totalScoredVotes).toFixed(1)) : null;
+    const voterBreakdown = participants
+      .filter((participant) => memberCanVoteByMemberId[participant.id] ?? false)
+      .map((participant) => ({
+        id: participant.id,
+        name: participant.name,
+        role: participant.role,
+        score: participant.voteScore,
+        isOutlier: Boolean(
+          winnerScore && participant.voteScore && participant.voteScore !== winnerScore,
+        ),
+      }));
 
     return {
       ritual: {
@@ -408,9 +461,22 @@ export const getSessionScreenData = query({
         membership.role === "OWNER" || membership.role === "ADMIN",
       voteProgress: currentVotingSession
         ? {
-            submitted: await countSubmittedVotesQuery(ctx, currentVotingSession._id),
-            totalVoters: await countVotersInRitualQuery(ctx, args.ritualId),
-          }
+          submitted: await countSubmittedVotesQuery(ctx, currentVotingSession._id),
+          totalVoters: await countVotersInRitualQuery(ctx, args.ritualId),
+        }
+        : null,
+      results: shouldShowResults
+        ? {
+          finalScore: winnerScore,
+          topScores,
+          hasTie,
+            selectedFinalScore: currentVotingSession?.finalScore ?? null,
+          averageScoreIndex,
+          agreementPercent,
+          totalVotes: totalScoredVotes,
+          distribution: orderedDistribution,
+          voterBreakdown,
+        }
         : null,
     };
   },
@@ -597,6 +663,7 @@ export const submitVote = mutation({
       await ctx.db.patch(existingVote._id, {
         score: args.score,
         hasVoted: true,
+        voteStatus: "VOTADO",
         votedAt: now,
       });
     } else {
@@ -605,6 +672,7 @@ export const submitVote = mutation({
         userId,
         score: args.score,
         hasVoted: true,
+        voteStatus: "VOTADO",
         votedAt: now,
       });
     }
@@ -625,6 +693,49 @@ export const submitVote = mutation({
     }
 
     return { revealed };
+  },
+});
+
+export const setVoteThinkingStatus = mutation({
+  args: {
+    sessionId: v.id("votingSessions"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuthenticatedUser(ctx);
+    const session = await getSessionOrThrow(ctx, args.sessionId);
+    requireOpenStatus(session.status);
+    if (session.status !== "PENDING") {
+      throw new Error("Only pending sessions can update vote status");
+    }
+
+    const member = await getRitualMember(ctx, session.ritualId, userId);
+    if (!member.canVote) {
+      throw new Error("Unauthorized");
+    }
+
+    const existingVote = await ctx.db
+      .query("votes")
+      .withIndex("by_sessionId_and_userId", (q) =>
+        q.eq("sessionId", args.sessionId).eq("userId", userId),
+      )
+      .unique();
+
+    if (existingVote) {
+      await ctx.db.patch(existingVote._id, {
+        hasVoted: false,
+        voteStatus: "PENSANDO",
+      });
+    } else {
+      await ctx.db.insert("votes", {
+        sessionId: args.sessionId,
+        userId,
+        score: null,
+        hasVoted: false,
+        voteStatus: "PENSANDO",
+      });
+    }
+
+    return { status: "PENSANDO" as const };
   },
 });
 
@@ -683,6 +794,7 @@ export const finalizeVotingSession = mutation({
 export const closeVotingSession = mutation({
   args: {
     sessionId: v.id("votingSessions"),
+    finalScore: v.string(),
   },
   handler: async (ctx, args) => {
     const userId = await requireAuthenticatedUser(ctx);
@@ -698,8 +810,16 @@ export const closeVotingSession = mutation({
       throw new Error("Only revealed sessions can be closed");
     }
 
+    const ritual = await ctx.db.get(session.ritualId);
+    if (!ritual) {
+      throw new Error("Ritual not found");
+    }
+
+    requireValidScore(ritual.deckType, args.finalScore);
+
     await ctx.db.patch(session._id, {
       status: "DONE",
+      finalScore: args.finalScore,
       closedAt: Date.now(),
     });
 
@@ -741,11 +861,14 @@ export const reopenVotingSession = mutation({
       await ctx.db.patch(vote._id, {
         score: null,
         hasVoted: false,
+        voteStatus: "PENSANDO",
+        votedAt: undefined,
       });
     }
 
     await ctx.db.patch(session._id, {
       status: "PENDING",
+      finalScore: undefined,
     });
 
     return { status: "PENDING" as const };

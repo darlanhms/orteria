@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useConvexMutation } from "@convex-dev/react-query"
+import { useConvexAction, useConvexMutation } from "@convex-dev/react-query"
 import { useMutation } from "@tanstack/react-query"
 import { useEffect, useRef } from "react"
 import { useForm } from "react-hook-form"
@@ -90,28 +90,19 @@ export function NewVotingSessionModal({
       onSessionCreated?.()
     },
   })
+  const getClickUpTask = useConvexAction(api.clickup.getClickUpTask)
   const clickUpTaskLookup = useMutation({
     mutationFn: async (taskId: string) => {
-      const response = await fetch(`/api/clickup/task?taskId=${encodeURIComponent(taskId)}`, {
-        method: "GET",
-        headers: { accept: "application/json" },
-      })
-
-      if (!response.ok) {
-        const errorPayload = (await response.json().catch(() => null)) as { error?: string } | null
-        throw new Error(errorPayload?.error ?? "Não foi possível carregar a task do ClickUp")
-      }
-
-      const payload = (await response.json()) as { name?: string }
+      const payload = await getClickUpTask({ taskId })
       const taskName = payload.name?.trim()
       if (!taskName) {
         throw new Error("Task sem nome no ClickUp")
       }
-      return { taskId, taskName }
+      const clickUpId = payload.clickUpId?.trim() || taskId
+      return { taskId, taskName, clickUpId }
     },
-    onSuccess: ({ taskId, taskName }) => {
+    onSuccess: ({ taskName }) => {
       form.setValue("sessionName", taskName, { shouldDirty: true, shouldValidate: true })
-      lastResolvedTaskIdRef.current = taskId
     },
   })
   const externalUrlValue = form.watch("externalUrl")
@@ -124,6 +115,10 @@ export function NewVotingSessionModal({
       return
     }
 
+    if (taskId !== lastResolvedTaskIdRef.current) {
+      lastResolvedTaskIdRef.current = null
+    }
+
     if (taskId === lastResolvedTaskIdRef.current) {
       return
     }
@@ -134,7 +129,11 @@ export function NewVotingSessionModal({
 
     const timeoutId = window.setTimeout(() => {
       clickUpTaskLookup.reset()
-      clickUpTaskLookup.mutate(taskId)
+      clickUpTaskLookup.mutate(taskId, {
+        onSuccess: ({ clickUpId }) => {
+          lastResolvedTaskIdRef.current = clickUpId
+        },
+      })
     }, 350)
 
     return () => {
@@ -148,6 +147,7 @@ export function NewVotingSessionModal({
       ritualId,
       sessionName: values.sessionName,
       externalUrl: values.externalUrl?.trim() ? values.externalUrl.trim() : undefined,
+      clickUpId: lastResolvedTaskIdRef.current ?? undefined,
     })
   }
 
