@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
@@ -12,6 +13,7 @@ export type SessionParticipant = {
 
 export interface ParticipantsPanelProps {
   readonly participants: ReadonlyArray<SessionParticipant>
+  readonly headerAction?: ReactNode
 }
 
 function AvatarInitials({ name }: { readonly name: string }) {
@@ -34,17 +36,13 @@ function AvatarInitials({ name }: { readonly name: string }) {
 
 export function ParticipantsPanel({
   participants,
+  headerAction,
 }: ParticipantsPanelProps) {
   return (
     <Card className="bg-card/60 border-border/10">
       <CardHeader className="flex-row items-center justify-between gap-4 pb-4">
         <CardTitle className="text-primary font-extrabold text-lg">Participantes</CardTitle>
-        <div
-          className="w-10 h-6 rounded-full bg-secondary/20 border border-border/10 flex items-center p-1"
-          aria-hidden="true"
-        >
-          <div className={cn("w-4 h-4 rounded-full bg-secondary/80")} />
-        </div>
+        {headerAction}
       </CardHeader>
 
       <CardContent className="space-y-3">

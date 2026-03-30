@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useConvexMutation } from "@convex-dev/react-query"
 import { useMutation } from "@tanstack/react-query"
+import { useEffect, useRef } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import type { Id } from "~convex/_generated/dataModel"
@@ -24,6 +25,20 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+
+function extractClickUpTaskId(urlValue: string): string | null {
+  try {
+    const parsed = new URL(urlValue)
+    if (parsed.hostname !== "app.clickup.com") {
+      return null
+    }
+
+    const taskPathMatch = parsed.pathname.match(/^\/t\/([a-zA-Z0-9]+)$/)
+    return taskPathMatch?.[1] ?? null
+  } catch {
+    return null
+  }
+}
 
 const createSessionSchema = z.object({
   sessionName: z.string().trim().min(1, "Informe o nome da sessão"),
@@ -58,15 +73,6 @@ export function NewVotingSessionModal({
   onOpenChange,
   onSessionCreated,
 }: NewVotingSessionModalProps) {
-  const createSessionMutation = useMutation({
-    mutationFn: useConvexMutation(api.ritualVoting.createVotingSessionFromTitle),
-    onSuccess: () => {
-      form.reset()
-      onOpenChange(false)
-      onSessionCreated?.()
-    },
-  })
-
   const form = useForm<CreateSessionFormValues>({
     resolver: zodResolver(createSessionSchema),
     mode: "onChange",
@@ -75,6 +81,66 @@ export function NewVotingSessionModal({
       externalUrl: "",
     },
   })
+
+  const createSessionMutation = useMutation({
+    mutationFn: useConvexMutation(api.ritualVoting.createVotingSessionFromTitle),
+    onSuccess: () => {
+      form.reset()
+      onOpenChange(false)
+      onSessionCreated?.()
+    },
+  })
+  const clickUpTaskLookup = useMutation({
+    mutationFn: async (taskId: string) => {
+      const response = await fetch(`/api/clickup/task?taskId=${encodeURIComponent(taskId)}`, {
+        method: "GET",
+        headers: { accept: "application/json" },
+      })
+
+      if (!response.ok) {
+        const errorPayload = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(errorPayload?.error ?? "Não foi possível carregar a task do ClickUp")
+      }
+
+      const payload = (await response.json()) as { name?: string }
+      const taskName = payload.name?.trim()
+      if (!taskName) {
+        throw new Error("Task sem nome no ClickUp")
+      }
+      return { taskId, taskName }
+    },
+    onSuccess: ({ taskId, taskName }) => {
+      form.setValue("sessionName", taskName, { shouldDirty: true, shouldValidate: true })
+      lastResolvedTaskIdRef.current = taskId
+    },
+  })
+  const externalUrlValue = form.watch("externalUrl")
+  const lastResolvedTaskIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const taskId = extractClickUpTaskId(externalUrlValue ?? "")
+    if (!taskId) {
+      lastResolvedTaskIdRef.current = null
+      return
+    }
+
+    if (taskId === lastResolvedTaskIdRef.current) {
+      return
+    }
+
+    if (clickUpTaskLookup.isPending) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      clickUpTaskLookup.reset()
+      clickUpTaskLookup.mutate(taskId)
+    }, 350)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [externalUrlValue])
 
   function onCreateSession(values: CreateSessionFormValues) {
     createSessionMutation.reset()
@@ -93,6 +159,8 @@ export function NewVotingSessionModal({
         if (!nextOpen) {
           form.reset()
           createSessionMutation.reset()
+          clickUpTaskLookup.reset()
+          lastResolvedTaskIdRef.current = null
         }
       }}
     >
@@ -136,8 +204,11 @@ export function NewVotingSessionModal({
                     />
                   </FormControl>
                   <FormDescription>
-                    Opcional. Facilita os votantes a encontrarem o item da sessão.
+                    Opcional. Em URL do ClickUp, você pode carregar o nome automaticamente.
                   </FormDescription>
+                  {clickUpTaskLookup.error && (
+                    <p className="text-sm text-destructive">{clickUpTaskLookup.error.message}</p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -155,10 +226,16 @@ export function NewVotingSessionModal({
             <DialogFooter className="mx-0 mb-0 border-0 bg-transparent px-0 pb-0 pt-1">
               <Button
                 type="submit"
-                disabled={!form.formState.isValid || createSessionMutation.isPending}
+                disabled={
+                  !form.formState.isValid ||
+                  createSessionMutation.isPending ||
+                  clickUpTaskLookup.isPending
+                }
                 className="h-12 w-full text-base font-bold"
               >
-                {createSessionMutation.isPending ? "Criando..." : "Criar sessão"}
+                {clickUpTaskLookup.isPending
+                  ? "Buscando..."
+                  : "Criar sessão"}
               </Button>
             </DialogFooter>
           </form>

@@ -8,7 +8,7 @@ import type { SessionVoteOption } from "./components/VoteOptionCard"
 import type { Id } from "~convex/_generated/dataModel"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TopNavBar } from "@/features/lobby/components/TopNavBar"
 import { api } from "~convex/_generated/api"
 
@@ -57,7 +57,7 @@ export function SessionScreen({
   const finalizeVotingSession = useMutation({
     mutationFn: useConvexMutation(api.ritualVoting.finalizeVotingSession),
   })
-  const { data: sessionData, isPending } = useQuery(
+  const { data: sessionData, isPending, isError, error } = useQuery(
     convexQuery(api.ritualVoting.getSessionScreenData, {
       ritualId: sessionId as Id<"rituals">,
     }),
@@ -95,7 +95,23 @@ export function SessionScreen({
     )
   }
 
-  const data = sessionData as NonNullable<typeof sessionData>
+  if (isError) {
+    return (
+      <div className="min-h-svh bg-background text-foreground flex items-center justify-center">
+        <p className="text-muted-foreground">{error.message}</p>
+      </div>
+    )
+  }
+
+  if (!sessionData) {
+    return (
+      <div className="min-h-svh bg-background text-foreground flex items-center justify-center">
+        <p className="text-muted-foreground">Falha ao carregar a sessão.</p>
+      </div>
+    )
+  }
+
+  const data = sessionData
 
   const isVotingOpen =
     data.currentVotingSessionStatus === "PENDING" &&
@@ -104,6 +120,11 @@ export function SessionScreen({
   const allVotesSubmitted =
     (data.voteProgress?.totalVoters ?? 0) > 0 &&
     (data.voteProgress?.submitted ?? 0) >= (data.voteProgress?.totalVoters ?? 0)
+  const canRevealNow =
+    data.canManageSessions &&
+    Boolean(data.currentVotingSessionId) &&
+    data.currentVotingSessionStatus === "PENDING" &&
+    allVotesSubmitted
 
   async function handleSubmitVote() {
     if (!isVotingOpen || !selectedVote || !data.currentVotingSessionId) {
@@ -158,15 +179,6 @@ export function SessionScreen({
                 <CardTitle className="text-3xl font-extrabold tracking-tight text-foreground">
                   {data.currentSessionName ?? "Aguardando o líder criar uma nova sessão..."}
                 </CardTitle>
-                <CardDescription className="max-w-md">
-                  {data.currentSessionName && data.currentVotingSessionStatus === "PENDING"
-                    ? allVotesSubmitted && data.canManageSessions
-                      ? "Todos os votos foram confirmados. O líder/admin já pode encerrar esta sessão."
-                      : `Aguardando votos (${data.voteProgress?.submitted ?? 0}/${data.voteProgress?.totalVoters ?? 0}).`
-                    : data.currentVotingSessionStatus === "REVEALED"
-                      ? "Votos revelados. O líder/admin pode reabrir a rodada em caso de discrepância."
-                      : "Aguardando o líder criar uma nova sessão..."}
-                </CardDescription>
                 {data.currentSessionExternalUrl && (
                   <a
                     href={data.currentSessionExternalUrl}
@@ -180,34 +192,6 @@ export function SessionScreen({
                     Abrir item externo
                   </a>
                 )}
-                {data.canManageSessions && !data.currentVotingSessionId && (
-                  <div className="pt-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setHasDismissedAutoModal(false)
-                        setIsCreateModalOpen(true)
-                      }}
-                    >
-                      Criar nova sessão
-                    </Button>
-                  </div>
-                )}
-                {data.canManageSessions &&
-                  data.currentVotingSessionId &&
-                  data.currentVotingSessionStatus === "PENDING" &&
-                  allVotesSubmitted && (
-                    <div className="pt-2">
-                      <Button
-                        onClick={handleFinalizeVotingSession}
-                        disabled={finalizeVotingSession.isPending}
-                      >
-                        {finalizeVotingSession.isPending
-                          ? "Finalizando..."
-                          : "Encerrar sessão de votação"}
-                      </Button>
-                    </div>
-                  )}
               </CardHeader>
             </Card>
 
@@ -249,7 +233,30 @@ export function SessionScreen({
           </section>
 
           <div className="lg:col-span-5 space-y-6">
-            <ParticipantsPanel participants={data.participants} />
+            <ParticipantsPanel
+              participants={data.participants}
+              headerAction={
+                data.canManageSessions && !data.currentVotingSessionId ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setHasDismissedAutoModal(false)
+                      setIsCreateModalOpen(true)
+                    }}
+                  >
+                    Criar nova sessão
+                  </Button>
+                ) : canRevealNow ? (
+                  <Button onClick={handleFinalizeVotingSession} disabled={finalizeVotingSession.isPending}>
+                    {finalizeVotingSession.isPending ? "Revelando..." : "Revelar"}
+                  </Button>
+                ) : data.voteProgress ? (
+                  <div className="rounded-md border border-primary/25 bg-primary/10 px-2 py-1 text-xs font-bold text-primary">
+                    {data.voteProgress.submitted}/{data.voteProgress.totalVoters}
+                  </div>
+                ) : null
+              }
+            />
           </div>
         </div>
       </main>

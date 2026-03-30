@@ -22,6 +22,7 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
   const trustedOrigins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://orteria-git-main-darlan-hs-projects.vercel.app",
     process.env.BETTER_AUTH_URL,
   ].filter((origin): origin is string => Boolean(origin));
 
