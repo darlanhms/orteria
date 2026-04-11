@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, type ReactElement } from "react"
 import { authClient } from "@/lib/auth-client"
 import { Button } from "@/components/ui/button"
 import {
@@ -33,7 +33,7 @@ function GoogleIcon() {
   )
 }
 
-export function AuthDialog({ children }: { children: React.ReactNode }) {
+export function AuthDialog({ children }: { children: ReactElement }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -54,7 +54,7 @@ export function AuthDialog({ children }: { children: React.ReactNode }) {
 
   return (
     <Dialog>
-      <DialogTrigger>{children}</DialogTrigger>
+      <DialogTrigger render={children} />
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl">Entrar</DialogTitle>

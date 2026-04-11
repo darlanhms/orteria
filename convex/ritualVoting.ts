@@ -36,12 +36,12 @@ const deckOptions = {
   ],
   "T-Shirt": [
     { id: "RN", label: "RN", sizingLabel: "ATE 1 HORA", clickUpOptionValue: "c8a84df7-0957-476d-9ddf-afadfa3aad88" },
-    { id: "PP", label: "PP", sizingLabel: "1 A 4 HORAS | 1/2 DIA", clickUpOptionValue: "77ed47da-ddb9-4d60-a13e-0884f7e6ed36" },
-    { id: "P", label: "P", sizingLabel: "4 A 8 HORAS | 1 DIA", clickUpOptionValue: "c97dcbcf-4831-4a3d-8a32-d82d6bae7d11" },
-    { id: "M", label: "M", sizingLabel: "8 A 16 HORAS | 2 DIAS", clickUpOptionValue: "003ab98d-124b-4137-92b7-dd5652732e74" },
-    { id: "G", label: "G", sizingLabel: "16 A 24 HORAS | 3 DIAS", clickUpOptionValue: "ac6dffd3-dc67-4146-89ed-0dfed8d534d7" },
-    { id: "GG", label: "GG", sizingLabel: "24 A 40 HORAS | 5 DIAS", clickUpOptionValue: "61c44ebf-6e61-4a80-b590-b1563ee901a3" },
-    { id: "XGG", label: "XGG", sizingLabel: "MAIS QUE 40 HORAS | X DIAS", clickUpOptionValue: "a5239881-574a-464d-8d84-d0dd6ccb37d4" },
+    { id: "PP", label: "PP", sizingLabel: "1 A 4 HORAS", clickUpOptionValue: "77ed47da-ddb9-4d60-a13e-0884f7e6ed36" },
+    { id: "P", label: "P", sizingLabel: "4 A 8 HORAS", clickUpOptionValue: "c97dcbcf-4831-4a3d-8a32-d82d6bae7d11" },
+    { id: "M", label: "M", sizingLabel: "8 A 16 HORAS", clickUpOptionValue: "003ab98d-124b-4137-92b7-dd5652732e74" },
+    { id: "G", label: "G", sizingLabel: "16 A 24 HORAS", clickUpOptionValue: "ac6dffd3-dc67-4146-89ed-0dfed8d534d7" },
+    { id: "GG", label: "GG", sizingLabel: "24 A 40 HORAS", clickUpOptionValue: "61c44ebf-6e61-4a80-b590-b1563ee901a3" },
+    { id: "XGG", label: "XGG", sizingLabel: "MAIS QUE 40 HORAS", clickUpOptionValue: "a5239881-574a-464d-8d84-d0dd6ccb37d4" },
   ],
   Linear: [
     { id: "1", label: "1", sizingLabel: "MUITO PEQUENO" },
@@ -156,52 +156,29 @@ async function countVotersInRitual(
 
 async function countSubmittedVotes(
   ctx: MutationCtx,
-  sessionId: Id<"votingSessions">,
+  session: Doc<"votingSessions">,
 ): Promise<number> {
-  let count = 0;
-  const votesQuery = ctx.db
-    .query("votes")
-    .withIndex("by_sessionId_and_hasVoted", (q) =>
-      q.eq("sessionId", sessionId).eq("hasVoted", true),
-    );
-
-  for await (const _vote of votesQuery) {
-    count += 1;
-  }
-
-  return count;
-}
-
-async function countSubmittedVotesQuery(
-  ctx: QueryCtx,
-  sessionId: Id<"votingSessions">,
-): Promise<number> {
-  let count = 0;
-  const votesQuery = ctx.db
-    .query("votes")
-    .withIndex("by_sessionId_and_hasVoted", (q) =>
-      q.eq("sessionId", sessionId).eq("hasVoted", true),
-    );
-
-  for await (const _vote of votesQuery) {
-    count += 1;
-  }
-
-  return count;
-}
-
-async function countVotersInRitualQuery(
-  ctx: QueryCtx,
-  ritualId: Id<"rituals">,
-): Promise<number> {
-  let count = 0;
+  const eligibleVoterIds = new Set<string>();
   const votersQuery = ctx.db
     .query("ritualMembers")
     .withIndex("by_ritualId_and_canVote", (q) =>
-      q.eq("ritualId", ritualId).eq("canVote", true),
+      q.eq("ritualId", session.ritualId).eq("canVote", true),
+    );
+  for await (const voter of votersQuery) {
+    eligibleVoterIds.add(voter.userId);
+  }
+
+  let count = 0;
+  const votesQuery = ctx.db
+    .query("votes")
+    .withIndex("by_sessionId_and_hasVoted", (q) =>
+      q.eq("sessionId", session._id).eq("hasVoted", true),
     );
 
-  for await (const _member of votersQuery) {
+  for await (const vote of votesQuery) {
+    if (!eligibleVoterIds.has(vote.userId)) {
+      continue;
+    }
     count += 1;
   }
 
@@ -213,7 +190,7 @@ async function assertAllVotesSubmitted(
   session: Doc<"votingSessions">,
 ): Promise<void> {
   const voterCount = await countVotersInRitual(ctx, session.ritualId);
-  const submittedVotes = await countSubmittedVotes(ctx, session._id);
+  const submittedVotes = await countSubmittedVotes(ctx, session);
   if (voterCount === 0 || submittedVotes < voterCount) {
     throw new Error("Cannot reveal votes before everyone votes");
   }
@@ -379,8 +356,6 @@ export const getSessionScreenData = query({
     const votesByUserId: Record<string, boolean> = {};
     const voteStatusByUserId: Record<string, "PRONTO" | "PENSANDO" | "VOTADO"> = {};
     const voteScoreByUserId: Record<string, string | null> = {};
-    const scoreCounts: Record<string, number> = {};
-    let totalScoredVotes = 0;
 
     if (currentVotingSession) {
       const votes = await ctx.db
@@ -392,10 +367,6 @@ export const getSessionScreenData = query({
         votesByUserId[vote.userId] = vote.hasVoted;
         voteStatusByUserId[vote.userId] = vote.voteStatus;
         voteScoreByUserId[vote.userId] = vote.score;
-        if (vote.hasVoted && vote.score) {
-          scoreCounts[vote.score] = (scoreCounts[vote.score] ?? 0) + 1;
-          totalScoredVotes += 1;
-        }
       }
     }
 
@@ -408,8 +379,10 @@ export const getSessionScreenData = query({
       .withIndex("by_ritualId", (q) => q.eq("ritualId", args.ritualId))
       .collect();
     const memberCanVoteByMemberId: Record<string, boolean> = {};
+    const memberCanVoteByUserId: Record<string, boolean> = {};
     for (const member of ritualMembers) {
       memberCanVoteByMemberId[member._id] = member.canVote;
+      memberCanVoteByUserId[member.userId] = member.canVote;
     }
 
     const participants = ritualMembers.map((member) => {
@@ -427,7 +400,8 @@ export const getSessionScreenData = query({
         id: member._id,
         name: displayName,
         isCurrentUser,
-        role: member.canVote ? member.role : `${member.role} (Espectador)`,
+        role: member.role,
+        canVote: member.canVote,
         status,
         voteScore: voteScoreByUserId[member.userId] ?? null,
       };
@@ -436,8 +410,21 @@ export const getSessionScreenData = query({
     const shouldShowResults =
       currentVotingSession?.status === "REVEALED" || currentVotingSession?.status === "DONE";
     const voteOptionOrder = deckOptions[ritual.deckType].map((option) => option.id);
+    const filteredScoreCounts: Record<string, number> = {};
+    let filteredTotalScoredVotes = 0;
+    for (const [userId, score] of Object.entries(voteScoreByUserId)) {
+      if (!memberCanVoteByUserId[userId]) {
+        continue;
+      }
+      if (!score || !votesByUserId[userId]) {
+        continue;
+      }
+      filteredScoreCounts[score] = (filteredScoreCounts[score] ?? 0) + 1;
+      filteredTotalScoredVotes += 1;
+    }
+
     const orderedDistribution = voteOptionOrder
-      .map((score) => ({ score, count: scoreCounts[score] ?? 0 }))
+      .map((score) => ({ score, count: filteredScoreCounts[score] ?? 0 }))
       .filter((item) => item.count > 0);
     const maxVoteCount = orderedDistribution.reduce((max, item) => Math.max(max, item.count), 0);
     const topScores = orderedDistribution
@@ -446,15 +433,17 @@ export const getSessionScreenData = query({
     const hasTie = topScores.length > 1;
     const winnerScore = !hasTie && topScores.length === 1 ? topScores[0] : null;
     const agreementPercent =
-      totalScoredVotes > 0 && maxVoteCount > 0
-        ? Math.round((maxVoteCount / totalScoredVotes) * 100)
+      filteredTotalScoredVotes > 0 && maxVoteCount > 0
+        ? Math.round((maxVoteCount / filteredTotalScoredVotes) * 100)
         : 0;
     const weightedSum = orderedDistribution.reduce((acc, item) => {
       const scoreIndex = voteOptionOrder.indexOf(item.score);
       return acc + (scoreIndex + 1) * item.count;
     }, 0);
     const averageScoreIndex =
-      totalScoredVotes > 0 ? Number((weightedSum / totalScoredVotes).toFixed(1)) : null;
+      filteredTotalScoredVotes > 0
+        ? Number((weightedSum / filteredTotalScoredVotes).toFixed(1))
+        : null;
     const voterBreakdown = participants
       .filter((participant) => memberCanVoteByMemberId[participant.id] ?? false)
       .map((participant) => ({
@@ -481,10 +470,13 @@ export const getSessionScreenData = query({
       currentSessionExternalUrl: currentTask?.externalRef ?? null,
       canManageSessions:
         membership.role === "OWNER" || membership.role === "ADMIN",
+      currentUserCanVote: membership.canVote,
       voteProgress: currentVotingSession
         ? {
-          submitted: await countSubmittedVotesQuery(ctx, currentVotingSession._id),
-          totalVoters: await countVotersInRitualQuery(ctx, args.ritualId),
+          submitted: Object.entries(votesByUserId).filter(
+            ([userId, hasVoted]) => hasVoted && memberCanVoteByUserId[userId],
+          ).length,
+          totalVoters: ritualMembers.filter((member) => member.canVote).length,
         }
         : null,
       results: shouldShowResults
@@ -495,7 +487,7 @@ export const getSessionScreenData = query({
             selectedFinalScore: currentVotingSession?.finalScore ?? null,
           averageScoreIndex,
           agreementPercent,
-          totalVotes: totalScoredVotes,
+          totalVotes: filteredTotalScoredVotes,
           distribution: orderedDistribution,
           voterBreakdown,
         }
@@ -651,6 +643,114 @@ export const updateMyRitualMemberData = mutation({
   },
 });
 
+export const manageRitualMember = mutation({
+  args: {
+    ritualId: v.id("rituals"),
+    memberId: v.id("ritualMembers"),
+    action: v.union(v.literal("KICK"), v.literal("SET_READONLY"), v.literal("SET_CAN_VOTE")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuthenticatedUser(ctx);
+    const actingMember = await getRitualMember(ctx, args.ritualId, userId);
+    requireRitualAdmin(actingMember);
+
+    const targetMember = await ctx.db.get(args.memberId);
+    if (!targetMember || targetMember.ritualId !== args.ritualId) {
+      throw new Error("Member not found in this ritual");
+    }
+    if (targetMember.role === "OWNER" && args.action === "KICK") {
+      throw new Error("Cannot manage ritual owner");
+    }
+    if (targetMember.userId === actingMember.userId && args.action === "KICK") {
+      throw new Error("Use your own member settings");
+    }
+
+    const pendingSession = await ctx.db
+      .query("votingSessions")
+      .withIndex("by_ritualId_and_status", (q) =>
+        q.eq("ritualId", args.ritualId).eq("status", "PENDING"),
+      )
+      .take(1);
+    const activePendingSession = pendingSession[0] ?? null;
+
+    switch (args.action) {
+      case "KICK":
+        await ctx.db.delete(targetMember._id);
+        return { success: true, action: "KICK" as const };
+      case "SET_READONLY": {
+        await ctx.db.patch(targetMember._id, {
+          canVote: false,
+          lastSeenAt: Date.now(),
+        });
+
+        if (activePendingSession) {
+          const vote = await ctx.db
+            .query("votes")
+            .withIndex("by_sessionId_and_userId", (q) =>
+              q.eq("sessionId", activePendingSession._id).eq("userId", targetMember.userId),
+            )
+            .unique();
+
+          if (vote) {
+            await ctx.db.patch(vote._id, {
+              score: null,
+              hasVoted: false,
+              voteStatus: "PRONTO",
+              votedAt: undefined,
+            });
+          } else {
+            await ctx.db.insert("votes", {
+              sessionId: activePendingSession._id,
+              userId: targetMember.userId,
+              score: null,
+              hasVoted: false,
+              voteStatus: "PRONTO",
+            });
+          }
+        }
+
+        return { success: true, action: "SET_READONLY" as const };
+      }
+      case "SET_CAN_VOTE": {
+        await ctx.db.patch(targetMember._id, {
+          canVote: true,
+          lastSeenAt: Date.now(),
+        });
+
+        if (activePendingSession) {
+          const vote = await ctx.db
+            .query("votes")
+            .withIndex("by_sessionId_and_userId", (q) =>
+              q.eq("sessionId", activePendingSession._id).eq("userId", targetMember.userId),
+            )
+            .unique();
+
+          if (vote) {
+            await ctx.db.patch(vote._id, {
+              score: null,
+              hasVoted: false,
+              voteStatus: "PENSANDO",
+              votedAt: undefined,
+            });
+          } else {
+            await ctx.db.insert("votes", {
+              sessionId: activePendingSession._id,
+              userId: targetMember.userId,
+              score: null,
+              hasVoted: false,
+              voteStatus: "PENSANDO",
+            });
+          }
+        }
+
+        return { success: true, action: "SET_CAN_VOTE" as const };
+      }
+      default:
+        throw new Error("Unsupported management action");
+    }
+  },
+});
+
 export const submitVote = mutation({
   args: {
     sessionId: v.id("votingSessions"),
@@ -703,7 +803,7 @@ export const submitVote = mutation({
 
     if (session.autoRevealWhenAllVoted) {
       const voterCount = await countVotersInRitual(ctx, session.ritualId);
-      const submittedVotes = await countSubmittedVotes(ctx, args.sessionId);
+      const submittedVotes = await countSubmittedVotes(ctx, session);
 
       if (voterCount > 0 && submittedVotes >= voterCount) {
         await ctx.db.patch(session._id, {

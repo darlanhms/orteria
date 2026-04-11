@@ -4,7 +4,6 @@ import { useConvexMutation } from "@convex-dev/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { api } from "~convex/_generated/api"
 import { InitializeRitualSection, type InitializeRitualFormValues } from "./components/InitializeRitualSection"
-import { JoinSessionSection } from "./components/JoinSessionSection"
 import { TopNavBar } from "./components/TopNavBar"
 
 export function TaskScorerLobbyPage() {
@@ -37,15 +36,6 @@ export function TaskScorerLobbyPage() {
 
       <main className="max-w-7xl mx-auto px-6 py-12 lg:py-20">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start mt-16">
-          <JoinSessionSection
-            accessKey={["", "", "", "", "", ""]}
-            isEnterAtriumEnabled={false}
-            isJoiningAtrium={false}
-            onAccessKeyChange={() => {}}
-            onAccessKeyKeyDown={() => {}}
-            onJoinAtrium={() => {}}
-          />
-
           <InitializeRitualSection
             isManifesting={createRitual.isPending}
             submitError={submitError}

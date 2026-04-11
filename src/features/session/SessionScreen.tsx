@@ -3,7 +3,14 @@ import { convexQuery, useConvexAction, useConvexMutation } from "@convex-dev/rea
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { EditRitualMemberDataDialog } from "./components/EditRitualMemberDataDialog"
-import { ParticipantsPanel } from "./components/ParticipantsPanel"
+import {
+  ConfirmKickMemberDialog,
+  type ManageRitualMemberDialogTarget,
+} from "./components/ConfirmKickMemberDialog"
+import {
+  ParticipantsPanel,
+  type MemberManagementAction,
+} from "./components/ParticipantsPanel"
 import { NewVotingSessionModal } from "./components/NewVotingSessionModal"
 import { VoteOptionCard } from "./components/VoteOptionCard"
 import type { SessionVoteOption } from "./components/VoteOptionCard"
@@ -120,6 +127,9 @@ export function SessionScreen({
   const [joinMemberName, setJoinMemberName] = useState("")
   const [initialMemberNameForEdit, setInitialMemberNameForEdit] = useState("")
   const [isEditMemberNameOpen, setIsEditMemberNameOpen] = useState(false)
+  const [isConfirmKickOpen, setIsConfirmKickOpen] = useState(false)
+  const [memberActionToConfirm, setMemberActionToConfirm] = useState<MemberManagementAction | null>(null)
+  const [memberToManage, setMemberToManage] = useState<ManageRitualMemberDialogTarget | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedFinalScoreForClose, setSelectedFinalScoreForClose] = useState<string | null>(null)
   const [hasDismissedAutoModal, setHasDismissedAutoModal] = useState(false)
@@ -310,16 +320,20 @@ export function SessionScreen({
   }
 
   const data = sessionData
+  const voterParticipants = data.participants.filter((participant) => participant.canVote)
+  const spectatorParticipants = data.participants.filter((participant) => !participant.canVote)
+  const currentUserCanVote = data.currentUserCanVote
   const isVotingOpen =
     data.currentVotingSessionStatus === "PENDING" &&
     Boolean(data.currentVotingSessionId) &&
+    currentUserCanVote &&
     !submitVote.isPending
   const allVotesSubmitted =
     (data.voteProgress?.totalVoters ?? 0) > 0 &&
     (data.voteProgress?.submitted ?? 0) >= (data.voteProgress?.totalVoters ?? 0)
   const currentUserParticipant = data.participants.find((participant) => participant.isCurrentUser) ?? null
   const hasCurrentUserVoted = currentUserParticipant?.status === "VOTADO"
-  const hasAnyParticipantThinking = data.participants.some(
+  const hasAnyParticipantThinking = voterParticipants.some(
     (participant) => participant.status === "PENSANDO",
   )
   const canRevealNow =
@@ -354,6 +368,9 @@ export function SessionScreen({
   }
 
   function handleSelectVote(voteId: string) {
+    if (!currentUserCanVote) {
+      return
+    }
     setSelectedVote(voteId)
 
     if (
@@ -426,7 +443,28 @@ export function SessionScreen({
         open={isEditMemberNameOpen}
         ritualId={sessionId as Id<"rituals">}
         initialMemberName={initialMemberNameForEdit}
+        memberId={currentUserParticipant?.id as Id<"ritualMembers"> | undefined}
+        canManageReadOnly={data.canManageSessions}
+        canVote={currentUserParticipant?.canVote ?? true}
         onOpenChange={setIsEditMemberNameOpen}
+      />
+      <ConfirmKickMemberDialog
+        open={isConfirmKickOpen}
+        ritualId={sessionId as Id<"rituals">}
+        targetMember={memberToManage}
+        action={memberActionToConfirm}
+        onOpenChange={(open) => {
+          setIsConfirmKickOpen(open)
+          if (!open) {
+            setMemberToManage(null)
+            setMemberActionToConfirm(null)
+          }
+        }}
+        onConfirmed={() => {
+          setIsConfirmKickOpen(false)
+          setMemberToManage(null)
+          setMemberActionToConfirm(null)
+        }}
       />
 
       <main className="max-w-7xl mx-auto px-6 py-4 lg:py-8">
@@ -591,7 +629,7 @@ export function SessionScreen({
                 </Card>
               </section>
 
-              <section className="lg:col-span-5">
+              <section className="lg:col-span-5 space-y-6">
                 <Card className="bg-card/70 border-border/10">
                   <CardHeader>
                     <CardTitle>Detalhamento dos Votos</CardTitle>
@@ -607,11 +645,10 @@ export function SessionScreen({
                     {results.voterBreakdown.map((voter) => (
                       <div
                         key={voter.id}
-                        className={`flex items-center justify-between rounded-lg border p-3 ${
-                          voter.isOutlier
-                            ? "border-secondary/35 bg-secondary/10"
-                            : "border-border/20 bg-card/60"
-                        }`}
+                        className={`flex items-center justify-between rounded-lg border p-3 ${voter.isOutlier
+                          ? "border-secondary/35 bg-secondary/10"
+                          : "border-border/20 bg-card/60"
+                          }`}
                       >
                         <div className="min-w-0">
                           <div className="truncate font-bold">{voter.name}</div>
@@ -633,6 +670,26 @@ export function SessionScreen({
                     ))}
                   </CardContent>
                 </Card>
+                {spectatorParticipants.length > 0 ? (
+                  <ParticipantsPanel
+                    title="Espectadores"
+                    participants={spectatorParticipants}
+                    canManageMembers={data.canManageSessions}
+                    onEditSelfName={(currentName) => {
+                      setInitialMemberNameForEdit(currentName)
+                      setIsEditMemberNameOpen(true)
+                    }}
+                    onManageMember={(participant, action) => {
+                      setMemberToManage({
+                        id: participant.id,
+                        name: participant.name,
+                        role: participant.role,
+                      })
+                      setMemberActionToConfirm(action)
+                      setIsConfirmKickOpen(true)
+                    }}
+                  />
+                ) : null}
               </section>
             </div>
           </div>
@@ -665,7 +722,7 @@ export function SessionScreen({
               <Card className="border-l-4 border-l-secondary/60">
                 <CardHeader className="pb-4">
                   <CardTitle className="text-xl font-extrabold tracking-tight">
-                    Coloque seu Voto
+                    {currentUserCanVote ? "Coloque seu Voto" : "Modo leitura"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -685,10 +742,16 @@ export function SessionScreen({
                   {setVoteThinkingStatus.error && (
                     <p className="text-sm text-destructive">{setVoteThinkingStatus.error.message}</p>
                   )}
+                  {!currentUserCanVote && (
+                    <p className="text-sm text-muted-foreground">
+                      Você está em modo leitura e acompanha a votação como espectador.
+                    </p>
+                  )}
                   <Button
                     size="lg"
                     onClick={handleSubmitVote}
                     disabled={
+                      !currentUserCanVote ||
                       !data.currentVotingSessionId ||
                       data.currentVotingSessionStatus !== "PENDING" ||
                       !selectedVote ||
@@ -696,13 +759,15 @@ export function SessionScreen({
                     }
                     className="w-full mt-6 h-auto py-4 text-lg"
                   >
-                    {submitVote.isPending
-                      ? "Enviando..."
-                      : hasCurrentUserVoted
-                        ? "Mudar de ideia"
-                        : selectedVote
-                          ? "Pronto"
-                          : "Selecione um voto"}
+                    {!currentUserCanVote
+                      ? "Você está em modo leitura"
+                      : submitVote.isPending
+                        ? "Enviando..."
+                        : hasCurrentUserVoted
+                          ? "Mudar de ideia"
+                          : selectedVote
+                            ? "Pronto"
+                            : "Selecione um voto"}
                   </Button>
                 </CardContent>
               </Card>
@@ -710,10 +775,20 @@ export function SessionScreen({
 
             <div className="lg:col-span-5 space-y-6">
               <ParticipantsPanel
-                participants={data.participants}
+                participants={voterParticipants}
+                canManageMembers={data.canManageSessions}
                 onEditSelfName={(currentName) => {
                   setInitialMemberNameForEdit(currentName)
                   setIsEditMemberNameOpen(true)
+                }}
+                onManageMember={(participant, action) => {
+                  setMemberToManage({
+                    id: participant.id,
+                    name: participant.name,
+                    role: participant.role,
+                  })
+                  setMemberActionToConfirm(action)
+                  setIsConfirmKickOpen(true)
                 }}
                 headerAction={
                   data.canManageSessions && !data.currentVotingSessionId ? (
@@ -739,6 +814,26 @@ export function SessionScreen({
                   ) : null
                 }
               />
+              {spectatorParticipants.length > 0 ? (
+                <ParticipantsPanel
+                  title="Espectadores"
+                  participants={spectatorParticipants}
+                  canManageMembers={data.canManageSessions}
+                  onEditSelfName={(currentName) => {
+                    setInitialMemberNameForEdit(currentName)
+                    setIsEditMemberNameOpen(true)
+                  }}
+                  onManageMember={(participant, action) => {
+                    setMemberToManage({
+                      id: participant.id,
+                      name: participant.name,
+                      role: participant.role,
+                    })
+                    setMemberActionToConfirm(action)
+                    setIsConfirmKickOpen(true)
+                  }}
+                />
+              ) : null}
             </div>
           </div>
         )}

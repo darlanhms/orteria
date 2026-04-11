@@ -60,7 +60,7 @@ export function InitializeRitualSection({
   })
 
   return (
-    <Card className="lg:col-span-7 border-t border-t-primary/20">
+    <Card className="lg:col-span-12 border-t border-t-primary/20">
       <CardHeader className="pb-4">
         <CardTitle className="text-2xl flex items-center gap-3">
           <span className="material-symbols-outlined text-primary">auto_awesome</span>

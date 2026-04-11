@@ -29,11 +29,15 @@ export interface EditRitualMemberDataDialogProps {
   readonly open: boolean
   readonly ritualId: Id<"rituals">
   readonly initialMemberName: string
+  readonly memberId?: Id<"ritualMembers">
+  readonly canManageReadOnly?: boolean
+  readonly canVote?: boolean
   readonly onOpenChange: (open: boolean) => void
 }
 
 const editRitualMemberDataSchema = z.object({
   memberName: z.string().trim().min(1, "Informe seu nome no ritual"),
+  participationMode: z.enum(["VOTER", "READONLY"]),
 })
 
 type EditRitualMemberDataValues = z.infer<typeof editRitualMemberDataSchema>
@@ -42,6 +46,9 @@ export function EditRitualMemberDataDialog({
   open,
   ritualId,
   initialMemberName,
+  memberId,
+  canManageReadOnly = false,
+  canVote = true,
   onOpenChange,
 }: EditRitualMemberDataDialogProps) {
   const form = useForm<EditRitualMemberDataValues>({
@@ -49,11 +56,15 @@ export function EditRitualMemberDataDialog({
     mode: "onChange",
     defaultValues: {
       memberName: initialMemberName,
+      participationMode: canVote ? "VOTER" : "READONLY",
     },
   })
 
   const updateMyRitualMemberData = useMutation({
     mutationFn: useConvexMutation(api.ritualVoting.updateMyRitualMemberData),
+  })
+  const manageRitualMember = useMutation({
+    mutationFn: useConvexMutation(api.ritualVoting.manageRitualMember),
     onSuccess: () => {
       onOpenChange(false)
     },
@@ -61,17 +72,41 @@ export function EditRitualMemberDataDialog({
 
   useEffect(() => {
     if (open) {
-      form.reset({ memberName: initialMemberName })
+      form.reset({
+        memberName: initialMemberName,
+        participationMode: canVote ? "VOTER" : "READONLY",
+      })
       updateMyRitualMemberData.reset()
+      manageRitualMember.reset()
     }
-  }, [open, initialMemberName, form])
+  }, [open, initialMemberName, canVote, form])
 
-  function onSubmit(values: EditRitualMemberDataValues) {
+  async function onSubmit(values: EditRitualMemberDataValues) {
     updateMyRitualMemberData.reset()
-    updateMyRitualMemberData.mutate({
-      ritualId,
-      memberName: values.memberName,
-    })
+    manageRitualMember.reset()
+    try {
+      const trimmedCurrentName = initialMemberName.trim()
+      const trimmedNextName = values.memberName.trim()
+      if (trimmedNextName !== trimmedCurrentName) {
+        await updateMyRitualMemberData.mutateAsync({
+          ritualId,
+          memberName: values.memberName,
+        })
+      }
+
+      const nextCanVote = values.participationMode === "VOTER"
+      if (canManageReadOnly && memberId && nextCanVote !== canVote) {
+        await manageRitualMember.mutateAsync({
+          ritualId,
+          memberId,
+          action: nextCanVote ? "SET_CAN_VOTE" : "SET_READONLY",
+        })
+      }
+
+      onOpenChange(false)
+    } catch {
+      // errors are surfaced by mutation states below
+    }
   }
 
   return (
@@ -81,6 +116,7 @@ export function EditRitualMemberDataDialog({
         onOpenChange(nextOpen)
         if (!nextOpen) {
           updateMyRitualMemberData.reset()
+          manageRitualMember.reset()
         }
       }}
     >
@@ -107,15 +143,54 @@ export function EditRitualMemberDataDialog({
                 </FormItem>
               )}
             />
+            {canManageReadOnly && (
+              <FormField
+                control={form.control}
+                name="participationMode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Modo de participação</FormLabel>
+                    <FormControl>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <Button
+                          type="button"
+                          variant={field.value === "VOTER" ? "default" : "outline"}
+                          onClick={() => form.setValue("participationMode", "VOTER", { shouldDirty: true })}
+                        >
+                          Pode votar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={field.value === "READONLY" ? "default" : "outline"}
+                          onClick={() =>
+                            form.setValue("participationMode", "READONLY", { shouldDirty: true })
+                          }
+                        >
+                          Somente leitura
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {updateMyRitualMemberData.error && (
               <p className="text-sm text-destructive">{updateMyRitualMemberData.error.message}</p>
+            )}
+            {manageRitualMember.error && (
+              <p className="text-sm text-destructive">{manageRitualMember.error.message}</p>
             )}
 
             <DialogFooter>
               <Button
                 type="submit"
-                disabled={updateMyRitualMemberData.isPending || !form.formState.isValid}
+                disabled={
+                  updateMyRitualMemberData.isPending ||
+                  manageRitualMember.isPending ||
+                  !form.formState.isValid
+                }
               >
                 {updateMyRitualMemberData.isPending ? "Salvando..." : "Salvar"}
               </Button>

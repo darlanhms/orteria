@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 
 import { AuthDialog } from "@/components/AuthDialog"
 import { Button } from "@/components/ui/button"
@@ -6,11 +6,6 @@ import { SessionScreen } from "@/features/session/SessionScreen"
 import { authClient } from "@/lib/auth-client"
 
 export const Route = createFileRoute("/session/$sessionId")({
-  beforeLoad: ({ context }) => {
-    if (!context.isAuthenticated) {
-      throw redirect({ to: "/" })
-    }
-  },
   component: SessionRoute,
 })
 
