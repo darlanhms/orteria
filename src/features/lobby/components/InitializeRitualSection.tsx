@@ -60,7 +60,7 @@ export function InitializeRitualSection({
   })
 
   return (
-    <Card className="lg:col-span-12 border-t border-t-primary/20">
+    <Card className="border-t border-t-primary/20">
       <CardHeader className="pb-4">
         <CardTitle className="text-2xl flex items-center gap-3">
           <span className="material-symbols-outlined text-primary">auto_awesome</span>
@@ -73,7 +73,7 @@ export function InitializeRitualSection({
 
       <CardContent>
         <form className="space-y-8" onSubmit={submit}>
-        {/* Session identity */}
+          {/* Session identity */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label>
@@ -103,29 +103,29 @@ export function InitializeRitualSection({
             </div>
           </div>
 
-        {/* Deck selection */}
+          {/* Deck selection */}
           <div className="space-y-4">
             <Label>
-            Tipo de Estimativa
-          </Label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {lobbyDeckOptions.map((opt) => (
-              <DeckOptionCard
-                key={opt.id}
-                deckId={opt.id}
-                title={opt.title}
-                description={opt.description}
-                icon={opt.icon}
-                isSelected={selectedDeck === opt.id}
-                onSelect={(deck) =>
-                  setValue("deckType", deck, { shouldDirty: true, shouldValidate: true })
-                }
-              />
-            ))}
-          </div>
+              Tipo de Estimativa
+            </Label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {lobbyDeckOptions.map((opt) => (
+                <DeckOptionCard
+                  key={opt.id}
+                  deckId={opt.id}
+                  title={opt.title}
+                  description={opt.description}
+                  icon={opt.icon}
+                  isSelected={selectedDeck === opt.id}
+                  onSelect={(deck) =>
+                    setValue("deckType", deck, { shouldDirty: true, shouldValidate: true })
+                  }
+                />
+              ))}
+            </div>
           </div>
 
-        {/* Manifest + participant avatars */}
+          {/* Manifest + participant avatars */}
           {submitError && (
             <p className="text-sm text-destructive">{submitError}</p>
           )}

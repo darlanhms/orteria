@@ -11,6 +11,11 @@ Convex agent skills for common tasks can be installed by running `npx convex ai-
 - Whenever you change code that affects business rules and are absolute essential for the functioning of the system, you must update this `AGENTS.md` file in the same task so the documented rules stay in sync with implementation.
 DO NOT UPDATE THIS FILE WHENEVER A SMALL UI CHANGE OCCURS.
 
+# Auth logic
+- This app uses convex + better auth using the setup created on this url https://labs.convex.dev/better-auth/framework-guides/tanstack-start
+- NEVER use auth related functions from convex directly
+- Every auth implementation should use better auth
+
 # Business Rules (Ritual Voting)
 
 This section documents the functional rules agreed during product implementation.
@@ -32,6 +37,9 @@ This section documents the functional rules agreed during product implementation
 ## Authentication and Access
 
 - Session screen must only render for authenticated users.
+- Convex queries that need `ctx.auth` must not run until the Convex client has finished loading the JWT from Better Auth (`useConvexAuth`: wait for `!isLoading && isAuthenticated` before enabling subscriptions).
+- `getRitualAccess` may run without a Convex identity: it still returns whether the ritual exists and its title, with `isMember: false` when unauthenticated (membership is only resolved when an identity is present).
+- The `/session/:sessionId` route param must be a valid Convex document id for the `rituals` table; validate on the client (`isConvexDocumentId`) before calling queries so arbitrary URL segments do not trigger `ArgumentValidationError` on `v.id("rituals")`.
 - If a user opens a ritual URL and is not a member, show a join flow.
 - Join flow must include ritual title and require a ritual-specific display name.
 
@@ -102,3 +110,8 @@ This section documents the functional rules agreed during product implementation
 - All fixed UI labels for this flow should be in Brazilian Portuguese.
 - Keep navbar/branding customizations untouched when applying session UI changes.
 - Member self-edit dialog should be extensible as a general member data form (future options beyond name).
+
+## Code logic rules
+- When a component is doing too much and out of it's own scope, break it into multiple components.
+- If a screen has a lot of complex logic, create a hook for that screen and use it for separate components inside that screen and try to break logic into the smaller components, also put the core logic inside the screen hook and use it on individual components instead of receiving a lot of props.
+- Avoid props hell at any cost, do not create components that receive a lot of props.

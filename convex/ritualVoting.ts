@@ -501,7 +501,6 @@ export const getRitualAccess = query({
     ritualId: v.id("rituals"),
   },
   handler: async (ctx, args) => {
-    const currentUserId = await requireAuthenticatedUserQuery(ctx);
     const ritual = await ctx.db.get(args.ritualId);
 
     if (!ritual) {
@@ -512,6 +511,17 @@ export const getRitualAccess = query({
       };
     }
 
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      // Public ritual metadata only; membership requires an authenticated identity.
+      return {
+        ritualExists: true,
+        ritualTitle: ritual.title,
+        isMember: false,
+      };
+    }
+
+    const currentUserId = identity.tokenIdentifier;
     const membership = await ctx.db
       .query("ritualMembers")
       .withIndex("by_ritualId_and_userId", (q) =>

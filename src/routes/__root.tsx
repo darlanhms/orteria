@@ -1,4 +1,4 @@
-import { HeadContent, Outlet, Scripts, createRootRouteWithContext, useRouteContext } from "@tanstack/react-router"
+import { HeadContent, Link, Outlet, Scripts, createRootRouteWithContext, useRouteContext } from "@tanstack/react-router"
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
 import { TanStackDevtools } from "@tanstack/react-devtools"
 import { createServerFn } from '@tanstack/react-start'
@@ -65,6 +65,7 @@ export const Route = createRootRouteWithContext<{
     }
   },
   component: RootComponent,
+  notFoundComponent: RootNotFound,
 })
 
 function RootComponent() {
@@ -104,5 +105,24 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <Scripts />
       </body>
     </html>
+  )
+}
+
+function RootNotFound() {
+  return (
+    <div className="min-h-svh bg-background text-foreground flex items-center justify-center px-6">
+      <div className="max-w-md text-center space-y-4">
+        <h1 className="text-3xl font-extrabold tracking-tight">Página não encontrada</h1>
+        <p className="text-muted-foreground">
+          A rota que você tentou acessar não existe ou foi movida.
+        </p>
+        <Link
+          to="/"
+          className="inline-flex items-center justify-center rounded-md border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/15"
+        >
+          Voltar para o início
+        </Link>
+      </div>
+    </div>
   )
 }

@@ -35,7 +35,7 @@ export function TaskScorerLobbyPage() {
       />
 
       <main className="max-w-7xl mx-auto px-6 py-12 lg:py-20">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start mt-16">
+        <div className="flex flex-col items-center justify-center">
           <InitializeRitualSection
             isManifesting={createRitual.isPending}
             submitError={submitError}
