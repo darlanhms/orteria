@@ -1,5 +1,7 @@
 import { useConvexMutation } from "@convex-dev/react-query"
 import { useMutation } from "@tanstack/react-query"
+import type { Id } from "~convex/_generated/dataModel"
+import { api } from "~convex/_generated/api"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -9,33 +11,71 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import type { Id } from "~convex/_generated/dataModel"
-import { api } from "~convex/_generated/api"
 import type { MemberManagementAction } from "./ParticipantsPanel"
 
-export interface ManageRitualMemberDialogTarget {
+export interface RitualMemberManagementTarget {
   readonly id: string
   readonly name: string
   readonly role: string
 }
 
-export interface ConfirmKickMemberDialogProps {
+export interface ManageRitualMemberDialogProps {
   readonly open: boolean
   readonly ritualId: Id<"rituals">
-  readonly targetMember: ManageRitualMemberDialogTarget | null
+  readonly targetMember: RitualMemberManagementTarget | null
   readonly action: MemberManagementAction | null
   readonly onOpenChange: (open: boolean) => void
   readonly onConfirmed: () => void
 }
 
-export function ConfirmKickMemberDialog({
+type ActionConfig = {
+  readonly title: string
+  readonly confirmButtonLabel: string
+  readonly description: (memberName: string) => string
+  readonly isDestructive?: boolean
+}
+
+const ACTION_CONFIG: Record<MemberManagementAction, ActionConfig> = {
+  KICK: {
+    title: "Confirmar expulsão",
+    confirmButtonLabel: "Confirmar expulsão",
+    description: (memberName) => `Tem certeza que deseja expulsar ${memberName} do ritual?`,
+    isDestructive: true,
+  },
+  SET_ADMIN: {
+    title: "Confirmar promoção para líder",
+    confirmButtonLabel: "Confirmar promoção",
+    description: (memberName) =>
+      `Tem certeza que deseja tornar ${memberName} um líder deste ritual?`,
+  },
+  SET_MEMBER: {
+    title: "Confirmar remoção de líder",
+    confirmButtonLabel: "Confirmar remoção",
+    description: (memberName) =>
+      `Tem certeza que deseja remover ${memberName} da liderança deste ritual?`,
+  },
+  SET_READONLY: {
+    title: "Confirmar modo leitura",
+    confirmButtonLabel: "Confirmar modo leitura",
+    description: (memberName) =>
+      `Tem certeza que deseja colocar ${memberName} em modo leitura?`,
+  },
+  SET_CAN_VOTE: {
+    title: "Confirmar permissão de voto",
+    confirmButtonLabel: "Confirmar permissão de voto",
+    description: (memberName) =>
+      `Tem certeza que deseja permitir que ${memberName} vote novamente?`,
+  },
+}
+
+export function ManageRitualMemberDialog({
   open,
   ritualId,
   targetMember,
   action,
   onOpenChange,
   onConfirmed,
-}: ConfirmKickMemberDialogProps) {
+}: ManageRitualMemberDialogProps) {
   const manageRitualMember = useMutation({
     mutationFn: useConvexMutation(api.ritualVoting.manageRitualMember),
     onSuccess: () => {
@@ -43,32 +83,14 @@ export function ConfirmKickMemberDialog({
     },
   })
 
-  const dialogTitle =
-    action === "KICK"
-      ? "Confirmar expulsão"
-      : action === "SET_READONLY"
-        ? "Confirmar modo leitura"
-        : action === "SET_CAN_VOTE"
-          ? "Confirmar permissão de voto"
-          : "Confirmar ação"
-  const dialogDescription = targetMember
-    ? action === "KICK"
-      ? `Tem certeza que deseja expulsar ${targetMember.name} do ritual?`
-      : action === "SET_READONLY"
-        ? `Tem certeza que deseja colocar ${targetMember.name} em modo leitura?`
-        : action === "SET_CAN_VOTE"
-          ? `Tem certeza que deseja permitir que ${targetMember.name} vote novamente?`
-          : "Selecione uma ação válida."
-    : "Selecione um membro para gerenciar."
-  const confirmButtonLabel =
-    action === "KICK"
-      ? "Confirmar expulsão"
-      : action === "SET_READONLY"
-        ? "Confirmar modo leitura"
-        : action === "SET_CAN_VOTE"
-          ? "Confirmar permissão de voto"
-          : "Confirmar"
-  const isDestructive = action === "KICK"
+  const actionConfig = action ? ACTION_CONFIG[action] : null
+  const dialogTitle = actionConfig?.title ?? "Confirmar ação"
+  const dialogDescription =
+    targetMember && actionConfig
+      ? actionConfig.description(targetMember.name)
+      : "Selecione um membro para gerenciar."
+  const confirmButtonLabel = actionConfig?.confirmButtonLabel ?? "Confirmar"
+  const isDestructive = actionConfig?.isDestructive ?? false
 
   return (
     <Dialog

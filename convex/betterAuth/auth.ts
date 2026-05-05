@@ -19,6 +19,8 @@ export const authComponent = createClient<DataModel, typeof schema>(
 
 // Better Auth Options
 export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
+  const minimumSessionDurationSeconds = 60 * 60 * 24 * 18;
+
   const trustedOrigins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -40,6 +42,13 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
     database: authComponent.adapter(ctx),
     emailAndPassword: {
       enabled: false,
+    },
+    session: {
+      // Keep authenticated sessions alive for at least 2.5 weeks.
+      expiresIn: minimumSessionDurationSeconds,
+      // Refresh active sessions daily during the valid window.
+      updateAge: 60 * 60 * 24,
+      disableSessionRefresh: false,
     },
     plugins: [
       convex({ authConfig })

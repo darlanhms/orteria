@@ -36,9 +36,7 @@ export function SessionVotingView({ screen }: SessionVotingViewProps) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start mt-8">
-      <section className="lg:col-span-7 relative overflow-hidden">
-        <div className="absolute -top-20 -right-20 w-[240px] h-[240px] bg-primary/15 blur-2xl pointer-events-none" />
-
+      <section className="lg:col-span-7">
         <Card className="bg-card/70 border-border/10 mb-6">
           <CardHeader>
             <CardTitle className="text-3xl font-extrabold tracking-tight text-foreground">
@@ -93,8 +91,7 @@ export function SessionVotingView({ screen }: SessionVotingViewProps) {
               onClick={actions.handleSubmitVote}
               disabled={
                 !derived.currentUserCanVote ||
-                !derived.isVotingOpen ||
-                !ui.selectedVote ||
+                !derived.canSubmitVote ||
                 mutations.submitVote.isPending
               }
               className="w-full mt-6 h-auto py-4 text-lg"

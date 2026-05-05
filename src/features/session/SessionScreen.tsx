@@ -1,7 +1,7 @@
 import { EditRitualMemberDataDialog } from "./components/EditRitualMemberDataDialog"
 import {
-  ConfirmKickMemberDialog,
-} from "./components/ConfirmKickMemberDialog"
+  ManageRitualMemberDialog,
+} from "./components/ManageRitualMemberDialog"
 import { JoinRitualGate } from "./components/JoinRitualGate"
 import { NewVotingSessionModal } from "./components/NewVotingSessionModal"
 import { SessionResultsView } from "./components/SessionResultsView"
@@ -161,7 +161,7 @@ export function SessionScreen({
         canVote={derived.currentUserParticipant?.canVote ?? true}
         onOpenChange={ui.setIsEditMemberNameOpen}
       />
-      <ConfirmKickMemberDialog
+      <ManageRitualMemberDialog
         open={ui.isConfirmKickOpen}
         ritualId={ids.ritualId}
         targetMember={ui.memberToManage}
@@ -185,8 +185,6 @@ export function SessionScreen({
           <SessionVotingView screen={screen} />
         )}
       </main>
-
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[80vw] h-[204px] bg-secondary/10 blur-[150px] pointer-events-none" />
     </div>
   )
 }

@@ -10,7 +10,12 @@ import {
 import { cn } from "@/lib/utils"
 
 export type SessionParticipantStatus = "PRONTO" | "PENSANDO" | "VOTADO"
-export type MemberManagementAction = "KICK" | "SET_READONLY" | "SET_CAN_VOTE"
+export type MemberManagementAction =
+  | "KICK"
+  | "SET_READONLY"
+  | "SET_CAN_VOTE"
+  | "SET_ADMIN"
+  | "SET_MEMBER"
 
 export type SessionParticipant = {
   readonly id: string
@@ -108,6 +113,21 @@ export function ParticipantsPanel({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {p.role === "MEMBER" ? (
+                    <>
+                      <DropdownMenuItem onClick={() => onManageMember?.(p, "SET_ADMIN")}>
+                        Tornar líder
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  ) : p.role === "ADMIN" ? (
+                    <>
+                      <DropdownMenuItem onClick={() => onManageMember?.(p, "SET_MEMBER")}>
+                        Remover líder
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  ) : null}
                   {p.canVote ? (
                     <DropdownMenuItem onClick={() => onManageMember?.(p, "SET_READONLY")}>
                       Tornar somente leitura
@@ -117,13 +137,17 @@ export function ParticipantsPanel({
                       Permitir votar
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onClick={() => onManageMember?.(p, "KICK")}
-                  >
-                    Expulsar membro
-                  </DropdownMenuItem>
+                  {p.role !== "OWNER" ? (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => onManageMember?.(p, "KICK")}
+                      >
+                        Expulsar membro
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
                 </DropdownMenuContent>
               </DropdownMenu>
             )

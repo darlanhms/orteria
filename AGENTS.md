@@ -59,6 +59,8 @@ This section documents the functional rules agreed during product implementation
   - `KICK`
   - `SET_READONLY`
   - `SET_CAN_VOTE`
+  - `SET_ADMIN`
+  - `SET_MEMBER`
 - Actions requiring confirmation (destructive or impactful) must use a confirmation dialog.
 - The owner cannot be kicked.
 - Self-kick is not allowed.

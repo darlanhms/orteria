@@ -657,7 +657,13 @@ export const manageRitualMember = mutation({
   args: {
     ritualId: v.id("rituals"),
     memberId: v.id("ritualMembers"),
-    action: v.union(v.literal("KICK"), v.literal("SET_READONLY"), v.literal("SET_CAN_VOTE")),
+    action: v.union(
+      v.literal("KICK"),
+      v.literal("SET_READONLY"),
+      v.literal("SET_CAN_VOTE"),
+      v.literal("SET_ADMIN"),
+      v.literal("SET_MEMBER"),
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await requireAuthenticatedUser(ctx);
@@ -667,6 +673,13 @@ export const manageRitualMember = mutation({
     const targetMember = await ctx.db.get(args.memberId);
     if (!targetMember || targetMember.ritualId !== args.ritualId) {
       throw new Error("Member not found in this ritual");
+    }
+    if (
+      args.action === "KICK" &&
+      actingMember.role === "ADMIN" &&
+      targetMember.role === "OWNER"
+    ) {
+      throw new Error("Admins cannot kick the ritual owner");
     }
     if (targetMember.role === "OWNER" && args.action === "KICK") {
       throw new Error("Cannot manage ritual owner");
@@ -754,6 +767,30 @@ export const manageRitualMember = mutation({
         }
 
         return { success: true, action: "SET_CAN_VOTE" as const };
+      }
+      case "SET_ADMIN": {
+        if (targetMember.role === "OWNER") {
+          throw new Error("Cannot change ritual owner role");
+        }
+
+        await ctx.db.patch(targetMember._id, {
+          role: "ADMIN",
+          lastSeenAt: Date.now(),
+        });
+
+        return { success: true, action: "SET_ADMIN" as const };
+      }
+      case "SET_MEMBER": {
+        if (targetMember.role === "OWNER") {
+          throw new Error("Cannot change ritual owner role");
+        }
+
+        await ctx.db.patch(targetMember._id, {
+          role: "MEMBER",
+          lastSeenAt: Date.now(),
+        });
+
+        return { success: true, action: "SET_MEMBER" as const };
       }
       default:
         throw new Error("Unsupported management action");

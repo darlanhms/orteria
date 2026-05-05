@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { useConvexAuth } from "convex/react"
 import { isConvexDocumentId } from "@/lib/convexDocumentId"
-import type { ManageRitualMemberDialogTarget } from "../components/ConfirmKickMemberDialog"
+import type { RitualMemberManagementTarget } from "../components/ManageRitualMemberDialog"
 import type { MemberManagementAction, SessionParticipant } from "../components/ParticipantsPanel"
 import type { Id } from "~convex/_generated/dataModel"
 
@@ -26,16 +26,13 @@ export function useSessionScreen({ sessionId }: UseSessionScreenArgs) {
   const [isEditMemberNameOpen, setIsEditMemberNameOpen] = useState(false)
   const [isConfirmKickOpen, setIsConfirmKickOpen] = useState(false)
   const [memberActionToConfirm, setMemberActionToConfirm] = useState<MemberManagementAction | null>(null)
-  const [memberToManage, setMemberToManage] = useState<ManageRitualMemberDialogTarget | null>(null)
+  const [memberToManage, setMemberToManage] = useState<RitualMemberManagementTarget | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedFinalScoreForClose, setSelectedFinalScoreForClose] = useState<string | null>(null)
   const [hasDismissedAutoModal, setHasDismissedAutoModal] = useState(false)
 
   const submitVote = useMutation({
     mutationFn: useConvexMutation(api.ritualVoting.submitVote),
-    onSuccess: () => {
-      setSelectedVote(null)
-    },
   })
   const setVoteThinkingStatus = useMutation({
     mutationFn: useConvexMutation(api.ritualVoting.setVoteThinkingStatus),
@@ -121,11 +118,34 @@ export function useSessionScreen({ sessionId }: UseSessionScreenArgs) {
   const currentUserParticipant =
     data?.participants.find((participant) => participant.isCurrentUser) ?? null
   const hasCurrentUserVoted = currentUserParticipant?.status === "VOTADO"
+  const currentVotingSessionId = data?.currentVotingSessionId ?? null
+
+  useEffect(() => {
+    setSelectedVote(null)
+  }, [currentVotingSessionId])
+
+  useEffect(() => {
+    if (selectedVote !== null) {
+      return
+    }
+    if (currentUserParticipant?.status !== "VOTADO") {
+      return
+    }
+    if (!currentUserParticipant.voteScore) {
+      return
+    }
+    setSelectedVote(currentUserParticipant.voteScore)
+  }, [currentUserParticipant, selectedVote])
+
   const isVotingOpen =
     data?.currentVotingSessionStatus === "PENDING" &&
     Boolean(data.currentVotingSessionId) &&
     currentUserCanVote &&
     !submitVote.isPending
+  const hasChangedVoteSelection =
+    Boolean(selectedVote) &&
+    (!hasCurrentUserVoted || selectedVote !== (currentUserParticipant?.voteScore ?? null))
+  const canSubmitVote = isVotingOpen && hasChangedVoteSelection
   const allVotesSubmitted =
     (data?.voteProgress?.totalVoters ?? 0) > 0 &&
     (data?.voteProgress?.submitted ?? 0) >= (data?.voteProgress?.totalVoters ?? 0)
@@ -165,7 +185,7 @@ export function useSessionScreen({ sessionId }: UseSessionScreenArgs) {
   }
 
   function handleSubmitVote() {
-    if (!isVotingOpen || !selectedVote || !data?.currentVotingSessionId) {
+    if (!canSubmitVote || !selectedVote || !data?.currentVotingSessionId) {
       return
     }
 
@@ -284,6 +304,7 @@ export function useSessionScreen({ sessionId }: UseSessionScreenArgs) {
       currentUserCanVote,
       hasCurrentUserVoted,
       isVotingOpen,
+      canSubmitVote,
       allVotesSubmitted,
       canRevealNow,
     },
