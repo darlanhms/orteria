@@ -33,7 +33,18 @@ function GoogleIcon() {
   )
 }
 
-export function AuthDialog({ children }: { children: ReactElement }) {
+export function AuthDialog({
+  children,
+  callbackURL,
+}: {
+  children: ReactElement
+  /**
+   * Para onde redirecionar após o login. Por padrão, retorna para a página
+   * atual, de modo que o usuário volte para o ritual que estava tentando
+   * acessar em vez de cair na home.
+   */
+  callbackURL?: string
+}) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -41,8 +52,14 @@ export function AuthDialog({ children }: { children: ReactElement }) {
     setIsLoading(true)
     setError(null)
     try {
+      const returnTo =
+        callbackURL ??
+        (typeof window !== "undefined"
+          ? window.location.pathname + window.location.search
+          : undefined)
       await authClient.signIn.social({
         provider: "google",
+        callbackURL: returnTo,
       })
     } catch (err: unknown) {
       const message =

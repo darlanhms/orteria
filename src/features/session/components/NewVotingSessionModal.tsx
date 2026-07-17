@@ -33,7 +33,13 @@ function extractClickUpTaskId(urlValue: string): string | null {
       return null
     }
 
-    const taskPathMatch = parsed.pathname.match(/^\/t\/([a-zA-Z0-9]+)$/)
+    // URLs de task do ClickUp vêm em dois formatos:
+    //   /t/<taskId>            (link simples)
+    //   /t/<teamId>/<taskId>   (link copiado já com o workspace)
+    // Em ambos, o ID da task é o último segmento após /t/.
+    const taskPathMatch = parsed.pathname.match(
+      /^\/t\/(?:[a-zA-Z0-9]+\/)?([a-zA-Z0-9]+)\/?$/,
+    )
     return taskPathMatch?.[1] ?? null
   } catch {
     return null
